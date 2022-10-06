@@ -25,7 +25,8 @@ train:
     MILE_STONE: !!seq [40, 80, 120]
 
 algorithm:
-  raw:
+  ts:
+    
 
 clean_model:
   mnist:

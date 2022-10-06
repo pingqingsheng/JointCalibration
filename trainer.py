@@ -79,8 +79,7 @@ class Trainer():
             scheduler.step()
             self.metric_train.flush()
             
-            for calibrator in calibrators:
-                calibrator.post_calibrate(model=model, optimizer=optimizer, calibrateloader=calibrateloader)
+            model.post_calibrate(optimizer=optimizer, calibrateloader=calibrateloader)
             
             if self.verbose and epoch%self.monitor_window==0:
                 

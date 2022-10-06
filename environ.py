@@ -142,6 +142,7 @@ class Environ():
         
         methodname_list = self.config['args']['method'].split('+')
         calibrators = []
+        calibrator_config = {'device':self.device}
         
         for method in methodname_list:
             
@@ -150,10 +151,11 @@ class Environ():
             elif method in self._available_method:
                 
                 if self.config['args']['dataset'] in self.config['algorithm']:
-                    calibrator_config = {k:v for k,v in self.config['algorithm'][self.config['args']['dataset']].items()}
+                    calibrator_config.update({k:v for k,v in self.config['algorithm'][self.config['args']['dataset']].items()})
                     
-                module = importlib.import_module(method)
-                calibrators.append(getattr(module(config=calibrator_config), self._available_method[method]))
+                module = importlib.import_module('calibrator.'+method)
+                calibrator = getattr(module, self._available_method[method])
+                calibrators.append(getattr(module, self._available_method[method])(config=calibrator_config))
             else:
                 raise NotImplementedError(f"Calibrator {method} is not defined !")
             
