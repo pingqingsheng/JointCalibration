@@ -147,11 +147,11 @@ class ResNet_MC(nn.Module):
                 m.train()
     
 def ResNet18(num_classes:int=10, in_channels:int=3):
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes, in_channels=in_channels)
 
 
 def ResNet34(num_classes:int=10, in_channels:int=3):
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes, in_channels=in_channels)
 
 
 # def ResNet50():
@@ -167,10 +167,10 @@ def ResNet34(num_classes:int=10, in_channels:int=3):
 
 
 def ResNet18_MC(num_classes:int=10, in_channels:int=3):
-    return ResNet_MC(BasicBlock_MC, [2, 2, 2, 2], num_classes=num_classes)
+    return ResNet_MC(BasicBlock_MC, [2, 2, 2, 2], num_classes=num_classes, in_channels=in_channels)
 
 def ResNet34_MC(num_classes:int=10, in_channels:int=3):
-    return ResNet_MC(BasicBlock_MC, [3, 4, 6, 3])
+    return ResNet_MC(BasicBlock_MC, [3, 4, 6, 3], num_classes=num_classes, in_channels=in_channels)
 
 def test():
     net = ResNet18(num_classes=10, in_channels=3)

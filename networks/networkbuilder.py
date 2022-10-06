@@ -2,7 +2,7 @@
 
 import torch
 
-from networks import ResNet18, ResNet18_MC, ResNet18_GP
+from .networks import ResNet18, ResNet18_MC, ResNet18_GP
 
 class NetWorkBuilder():
     

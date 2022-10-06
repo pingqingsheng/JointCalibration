@@ -1,15 +1,42 @@
 import os
 import os.path
+import random
+from collections import defaultdict
 
 import torch
 import torch.utils.data as data
+from torch.utils.data import Sampler
 import numpy as np
 from PIL import Image
 import gzip
 import codecs
 from tqdm import tqdm
 
-from datautils import download_url, makedir_exist_ok
+from ..datautils import download_url, makedir_exist_ok
+
+
+def get_int(b):
+    return int(codecs.encode(b, 'hex'), 16)
+
+
+def read_label_file(path):
+    with open(path, 'rb') as f:
+        data = f.read()
+        assert get_int(data[:4]) == 2049
+        length = get_int(data[4:8])
+        parsed = np.frombuffer(data, dtype=np.uint8, offset=8)
+        return torch.from_numpy(parsed).view(length).long()
+
+
+def read_image_file(path):
+    with open(path, 'rb') as f:
+        data = f.read()
+        assert get_int(data[:4]) == 2051
+        length = get_int(data[4:8])
+        num_rows = get_int(data[8:12])
+        num_cols = get_int(data[12:16])
+        parsed = np.frombuffer(data, dtype=np.uint8, offset=16)
+        return torch.from_numpy(parsed).view(length, num_rows, num_cols)
 
 
 class MNIST(data.Dataset):
@@ -76,7 +103,8 @@ class MNIST(data.Dataset):
                 self.num_data = len(self.data)
         self.delta_eta = torch.zeros(len(self.targets), 10)
 
-
+        self.eta = torch.nn.functional.one_hot(torch.tensor(self.targets))
+        
     def __getitem__(self, index):
         """
         Args:
@@ -84,7 +112,7 @@ class MNIST(data.Dataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target, delta_eta = self.data[index], int(self.targets[index]), self.delta_eta[index]
+        img, target, eta = self.data[index], int(self.targets[index]), self.eta[index]
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
@@ -96,7 +124,7 @@ class MNIST(data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return index, img, target, delta_eta
+        return index, img, target, eta
 
     def __len__(self):
         return len(self.data)
@@ -178,34 +206,14 @@ class MNIST(data.Dataset):
     def set_delta_eta(self, delta_eta):
         self.delta_eta = delta_eta
 
-
-def get_int(b):
-    return int(codecs.encode(b, 'hex'), 16)
-
-
-def read_label_file(path):
-    with open(path, 'rb') as f:
-        data = f.read()
-        assert get_int(data[:4]) == 2049
-        length = get_int(data[4:8])
-        parsed = np.frombuffer(data, dtype=np.uint8, offset=8)
-        return torch.from_numpy(parsed).view(length).long()
-
-
-def read_image_file(path):
-    with open(path, 'rb') as f:
-        data = f.read()
-        assert get_int(data[:4]) == 2051
-        length = get_int(data[4:8])
-        num_rows = get_int(data[8:12])
-        num_cols = get_int(data[12:16])
-        parsed = np.frombuffer(data, dtype=np.uint8, offset=16)
-        return torch.from_numpy(parsed).view(length, num_rows, num_cols)
+    def update_eta(self, eta):
+        self.eta = eta
 
 
 class MNIST_Combo(MNIST):
 
     def __init__(self, root, exogeneous_var, split='train', train_ratio=0.9, transform=None, target_transform=None, download=True):
+        super().__init__()
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
@@ -251,7 +259,7 @@ class MNIST_Combo(MNIST):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target, delta_eta, exogeneous_var = self.data[index], int(self.targets[index]), self.delta_eta[index], self.exogeneous_var[index]
+        img, target, eta, exogeneous_var = self.data[index], int(self.targets[index]), self.eta[index], self.exogeneous_var[index]
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
@@ -263,7 +271,112 @@ class MNIST_Combo(MNIST):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return index, img, target, delta_eta, exogeneous_var
+        return index, img, target, eta, exogeneous_var
+
+
+class MNIST_CSKD(MNIST):
+    """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
+    Args:
+        root (string): Root directory of dataset where ``processed/training.pt``
+            and  ``processed/test.pt`` exist.
+        train (bool, optional): If True, creates dataset from ``training.pt``,
+            otherwise from ``test.pt``.
+        download (bool, optional): If true, downloads the dataset from the internet and
+            puts it in root directory. If dataset is already downloaded, it is not
+            downloaded again.
+        transform (callable, optional): A function/transform that  takes in an PIL image
+            and returns a transformed version. E.g, ``transforms.RandomCrop``
+        target_transform (callable, optional): A function/transform that takes in the
+            target and transforms it.
+    """
+    urls = [
+        'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz',
+        'http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz',
+        'http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz',
+        'http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz',
+    ]
+    training_file = 'training.pt'
+    test_file = 'test.pt'
+    classes = ['0 - zero', '1 - one', '2 - two', '3 - three', '4 - four',
+               '5 - five', '6 - six', '7 - seven', '8 - eight', '9 - nine']
+
+    def __init__(self, root, split='train', train_ratio=0.9, transform=None, target_transform=None, download=True):
+        super().__init__()
+        self.root = os.path.expanduser(root)
+        self.transform = transform
+        self.target_transform = target_transform
+        self.split = split  # training set or test set
+        self.train_ratio = train_ratio
+
+        if download:
+            self.download()
+
+        if not self._check_exists():
+            raise RuntimeError('Dataset not found.' +' You can use download=True to download it')
+
+        if self.split == 'test':
+            data_file = self.test_file
+        else:
+            data_file = self.training_file
+        self.data, self.targets = torch.load(os.path.join(self.processed_folder, data_file))
+        self.targets = self.targets.numpy().tolist()
+        self.num_class = len(np.unique(self.targets))
+        self.num_data = len(self.data)
+
+        # split the original train set into train & validation set
+        if self.split != 'test':
+            num_data = len(self.data)
+            train_num = int(num_data * self.train_ratio)
+            if self.split == 'train':
+                self.data = self.data[:train_num]
+                self.targets = self.targets[:train_num]
+                self.num_class = len(np.unique(self.targets))
+                self.num_data = len(self.data)
+            else:
+                self.data = self.data[train_num:]
+                self.targets = self.targets[train_num:]
+                self.num_class = len(np.unique(self.targets))
+                self.num_data = len(self.data)
+        self.delta_eta = torch.zeros(len(self.targets), 10)
+
+        self.classwise_indices = defaultdict(list)
+        for i in range(len(self)):
+            y = self.targets[i]
+            self.classwise_indices[y].append(i)
+
+    def get_class(self, indice):
+        return self.targets[indice]
+
+
+class PairBatchSampler(Sampler):
+    def __init__(self, dataset, batch_size, num_iterations=None):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.num_iterations = num_iterations
+
+    def __iter__(self):
+        indices = list(range(len(self.dataset)))
+        random.shuffle(indices)
+        for k in range(len(self)):
+            if self.num_iterations is None:
+                offset = k*self.batch_size
+                batch_indices = indices[offset:offset+self.batch_size]
+            else:
+                batch_indices = random.sample(range(len(self.dataset)), self.batch_size)
+            pair_indices = []
+            for idx in batch_indices:
+                y = self.dataset.get_class(idx)
+                pair_indices.append(random.choice(self.dataset.classwise_indices[y]))
+            yield batch_indices + pair_indices
+
+    def __len__(self):
+        if self.num_iterations is None:
+            return (len(self.dataset)+self.batch_size-1) // self.batch_size
+        else:
+            return self.num_iterations
+
+
+
 
 
 # Train model with clean examples to generate IDL synthetic dataset
@@ -282,7 +395,7 @@ if __name__ == "__main__":
     import copy
     from termcolor import cprint
 
-    from data.MNIST import MNIST
+    from data.images.MNIST import MNIST
     from network.network import resnet18
     from utils.utils import _init_fn
 

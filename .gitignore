@@ -1,5 +1,22 @@
+*.swp
+
 __pycache__/
+
+.vscode/
 
 data/MNIST/
 data/CIFAR10/
+data/__pycache__/
+data/images/__pycache__/
 
+networks/__pycache__/
+
+clean_model/
+
+notebook/
+
+download/
+
+checkpoint/
+
+result/
