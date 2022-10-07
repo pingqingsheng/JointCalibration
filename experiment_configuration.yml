@@ -25,8 +25,20 @@ train:
     MILE_STONE: !!seq [40, 80, 120]
 
 algorithm:
-  ts:
-    
+  ensemble:
+    NUM_MODELS:   !!int 2
+  mcdrop:
+    NUM_SAMPLES:  !!int 3
+    DROPOUT_PROB: !!float 0.5
+  cskd:
+    LAMBDA:       !!float 1.0
+    TEMPERATURE:  !!float 4.0
+  focal:
+    GAMMA:        !!float 0
+    SIZE_AVERAGE: !!bool  true
+  bm:
+    PRIOR:        !!float 1
+    COEF:         !!float 0.01
 
 clean_model:
   mnist:

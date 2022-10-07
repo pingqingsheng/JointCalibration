@@ -38,6 +38,8 @@ if __name__  == '__main__':
     trainer = envconfig.create_trainer()
     calibrators = envconfig.create_calibrator()
     
+    os.environ['CUDA_VISIBLE_DEVICES'] = env['gpu']
+    
     os.makedirs(env['checkpoint_dir'], exist_ok=True)
     trainer.train(
         model = network.model,

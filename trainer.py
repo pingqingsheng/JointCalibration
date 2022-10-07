@@ -33,7 +33,7 @@ class Trainer():
         self.monitor_window = monitor_window
         self.device = device
         
-        self.criterion = torch.nn.CrossEntropyLoss()
+        self.criterion_default = torch.nn.CrossEntropyLoss()
         self.metric_train = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='train')
         self.metric_valid = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='valid')
         self.metric_test  = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='test')        
@@ -68,10 +68,11 @@ class Trainer():
                 
                 images, labels = images.to(self.device), labels.to(self.device)
                 outs = model(images)
-                loss = self.criterion(outs, labels) + sum([calibrator.criterion(outs, labels) for calibrator in calibrators])
+                loss = sum([calibrator.criterion(outs, labels) for calibrator in calibrators])
                 
                 optimizer.zero_grad()
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
                 optimizer.step()
                 
                 self.metric_train.update(outs.detach().cpu(), labels.detach().cpu(), loss.item(), eta_tilde)
@@ -110,7 +111,7 @@ class Trainer():
             
             images, labels = images.to(self.device), labels.to(self.device)
             outs = model(images)
-            loss = self.criterion(outs, labels)
+            loss = self.criterion_default(outs, labels)
             
             logger.update(outs.detach().cpu(), labels.detach().cpu(), loss.detach().cpu(), eta_tilde)
         

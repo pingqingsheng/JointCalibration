@@ -18,7 +18,12 @@ from calibrator.basecalibrator import BaseCalibrator
 class Environ():
     
     _available_method = {'raw':'BaseCalibrator', 
-                         'ts':'TemperatureScaling'}
+                         'ts':'TemperatureScaling', 
+                         'ensemble':'Ensemble', 
+                         'mcdrop': 'MCDrop', 
+                         'cskd': 'CSKD', 
+                         'focal': 'Focal', 
+                         'bm': 'BeliefMatching'}
     
     def __init__(self, config: MutableMapping) -> None:
         
@@ -37,9 +42,10 @@ class Environ():
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         
-        os.environ['CUDA_VISIBLE_DEVICES'] = self.config['args']['gpu']
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        gpu = self.config['args']['gpu']
+        self.device = torch.device(f'cuda:{gpu}' if torch.cuda.is_available() else 'cpu')
         
+        environ['gpu'] = gpu
         environ['result_dir'] = self.config['args']['result_dir']
         environ['checkpoint_dir'] = self.config['args']['checkpoint_dir']
         environ['fig_dir'] = self.config['args']['fig_dir']
@@ -99,9 +105,9 @@ class Environ():
         num_classes = int(self.config['data'][self.config['args']['dataset']]['N_CLASSES'])
         in_channels = int(self.config['data'][self.config['args']['dataset']]['N_CHANNELS'])
         
-        if self.config['args']['method'] == 'mcdrop':
+        if 'mcdrop' in self.config['args']['method']:
             networkname = 'resnet18_mc'
-        elif self.config['args']['method'] == 'gp':
+        elif 'gp' in self.config['args']['method']:
             networkname = 'resnet18_gp'
         else:
             networkname = 'resnet18'
@@ -149,12 +155,9 @@ class Environ():
             if method == 'raw':
                 calibrators.append(BaseCalibrator())
             elif method in self._available_method:
-                
-                if self.config['args']['dataset'] in self.config['algorithm']:
-                    calibrator_config.update({k:v for k,v in self.config['algorithm'][self.config['args']['dataset']].items()})
-                    
+                if method in self.config['algorithm']:
+                    calibrator_config.update({k:v for k,v in self.config['algorithm'][method].items()})    
                 module = importlib.import_module('calibrator.'+method)
-                calibrator = getattr(module, self._available_method[method])
                 calibrators.append(getattr(module, self._available_method[method])(config=calibrator_config))
             else:
                 raise NotImplementedError(f"Calibrator {method} is not defined !")

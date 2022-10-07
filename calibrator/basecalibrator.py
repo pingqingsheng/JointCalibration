@@ -34,5 +34,5 @@ class BaseCalibrator(torch.nn.Module):
             self.model.post_calibrate(optimizer, calibrateloader)
 
     @staticmethod
-    def criterion(*args, **kwargs):
-        return 0
+    def criterion(outs: torch.Tensor, labels: torch.Tensor, **kwargs) -> torch.Tensor:
+        return torch.nn.functional.cross_entropy(outs, labels)

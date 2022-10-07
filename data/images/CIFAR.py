@@ -415,7 +415,7 @@ class CIFAR10_CSKD(CIFAR10):
     def __init__(self, root, split='train', train_ratio=0.8, trust_ratio=0.1,
                  transform=None, target_transform=None,
                  download=False):
-        super().__init__()
+
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
@@ -500,6 +500,8 @@ class CIFAR10_CSKD(CIFAR10):
             y = self.targets[i]
             self.classwise_indices[y].append(i)
 
+        self.eta = torch.nn.functional.one_hot(torch.tensor(self.targets))
+        
     def get_class(self, indice):
         return self.targets[indice]
 

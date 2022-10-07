@@ -2,13 +2,13 @@
 from typing import Tuple, Callable
 
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler, BatchSampler, RandomSampler
 from torch.nn import functional as F
 from torchvision import transforms
 import numpy as np
 import copy
 
-from data.images.MNIST import MNIST, MNIST_CSKD
+from data.images.MNIST import MNIST, MNIST_CSKD, PairBatchSampler
 from data.images.CIFAR import CIFAR10, CIFAR10_CSKD
 from data.images.ImageNet32 import ImageNet32Dataset
 from .noise import noisify_with_P
@@ -96,16 +96,25 @@ class DataBuilder():
         
         return transform_train, transform_test   
     
+    @staticmethod
+    def get_sampler(dataset_name: str, batch_size:int) -> Sampler:
+        
+        if 'cskd' in dataset_name:
+            return lambda x: PairBatchSampler(x, batch_size=batch_size)
+        else:
+            return lambda x: BatchSampler(RandomSampler(x), batch_size=batch_size, drop_last=False)
+    
     def create(self):
         
         dataset = self.get_dataset(self.datasetname)
         transform_train, transform_test = self.get_transform(self.datasetname)
+        sampler = self.get_sampler(self.datasetname, batch_size=self.batch_size)
         
         self.trainset = dataset(root="./download", split="train", train_ratio=self.train_ratio, download=True, transform=transform_train)
         self.validset = dataset(root="./download", split="valid", train_ratio=self.train_ratio, download=True, transform=transform_test)
         self.testset  = dataset(root='./download', split="test", download=True, transform=transform_test)
         
-        self.train_loader = DataLoader(self.trainset, batch_size=self.batch_size, shuffle=True, num_workers=1)
+        self.train_loader = DataLoader(self.trainset, batch_sampler=sampler(self.trainset), num_workers=1)
         self.valid_loader = DataLoader(self.validset, batch_size=self.batch_size, shuffle=False, num_workers=1)
         self.test_loader  = DataLoader(self.testset,  batch_size=self.batch_size, shuffle=False, num_workers=1)        
         

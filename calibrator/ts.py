@@ -1,7 +1,4 @@
 #!/usr/env/bin python
-from os import supports_bytes_environ
-from typing import Tuple
-
 import torch
 
 from .basecalibrator import BaseCalibrator
@@ -77,3 +74,7 @@ class TemperatureScaling(BaseCalibrator):
 
         # print('Optimal temperature: %.3f' % self.temperature.item())
         # print('After temperature - NLL: %.3f, ECE: %.3f' % (after_temperature_nll, after_temperature_ece))
+        
+    @staticmethod
+    def criterion(*args, **kwargs):
+        return 0

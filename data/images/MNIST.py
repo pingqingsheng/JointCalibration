@@ -301,7 +301,7 @@ class MNIST_CSKD(MNIST):
                '5 - five', '6 - six', '7 - seven', '8 - eight', '9 - nine']
 
     def __init__(self, root, split='train', train_ratio=0.9, transform=None, target_transform=None, download=True):
-        super().__init__()
+        
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
@@ -344,12 +344,14 @@ class MNIST_CSKD(MNIST):
             y = self.targets[i]
             self.classwise_indices[y].append(i)
 
+        self.eta = torch.nn.functional.one_hot(torch.tensor(self.targets))
+        
     def get_class(self, indice):
         return self.targets[indice]
 
 
 class PairBatchSampler(Sampler):
-    def __init__(self, dataset, batch_size, num_iterations=None):
+    def __init__(self, dataset, batch_size, num_iterations=None, **kwargs):
         self.dataset = dataset
         self.batch_size = batch_size
         self.num_iterations = num_iterations
