@@ -13,7 +13,7 @@ from data.databuilder import DataBuilder
 from networks.networkbuilder import NetWorkBuilder
 from trainer import Trainer
 from calibrator.basecalibrator import BaseCalibrator
-
+from noise import inject_noise
 
 class Environ():
     
@@ -23,7 +23,9 @@ class Environ():
                          'mcdrop': 'MCDrop', 
                          'cskd': 'CSKD', 
                          'focal': 'Focal', 
-                         'bm': 'BeliefMatching'}
+                         'bm': 'BeliefMatching', 
+                         'gp': 'GP', 
+                         'lula': 'LULA'}
     
     def __init__(self, config: MutableMapping) -> None:
         
@@ -55,32 +57,26 @@ class Environ():
     
     
     def create_dataset(self) -> DataBuilder: 
-        
-        if self.config['args']['method'] == 'cskd':
-            datasetname = self.config['args']['dataset']+'_cskd'
-            calibrate_datasetname = self.config['args']['dataset']
-        elif self.config['args']['method'] == 'lula':
-            datasetname = self.config['args']['dataset']
-            calibrate_datasetname = 'imagenet32_4_'+self.config['args']['dataset']
-        else:
-            datasetname = self.config['args']['dataset']
-            calibrate_datasetname = datasetname
-        
+                
+        methodname_list = self.config['args']['method'].split('+')
+        datasetname = self.config['args']['dataset']
+            
         databuilder = DataBuilder(
             datasetname = datasetname, 
             train_ratio = self.config['data'][self.config['args']['dataset']]['TRAIN_VALIDATION_RATIO'], 
             batch_size  = self.config['train'][self.config['args']['dataset']]['BATCH_SIZE'], 
-            calibrate_datasetname = calibrate_datasetname
+            methodname_list=methodname_list
         )
         databuilder.create()
         
         noise_type = self.config['args']['noise_type']
         noise_strength = float(self.config['args']['noise_strength'])
+        
+        #>>> TODO: remake the clean model
         clean_model_path = self.config['clean_model'][self.config['args']['dataset']]['PATH']
         if noise_type == 'idl':
             clean_model_path = '.'+clean_model_path.split('.')[1]+f'_{int(noise_strength*100)}.pth'
-            
-        #TODO: remake the clean model
+
         f_star = NetWorkBuilder(networkname='resnet18', num_classes=10, in_channels=self.config['data'][self.config['args']['dataset']]['N_CHANNELS'])
         f_star.create()
         orig_state_dict  = f_star.model.state_dict()
@@ -90,13 +86,19 @@ class Environ():
         f_star.model.load_state_dict(orig_state_dict)
         f_star.model = f_star.model.to(self.device)
         setattr(f_star.model, 'device', self.device)
+        # <<<
         
-        databuilder.inject_noise(dataloader=databuilder.train_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='train')
-        databuilder.inject_noise(dataloader=databuilder.valid_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
-        databuilder.inject_noise(dataloader=databuilder.test_loader,  f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
-        if self.config['args']['method'] != 'lula':
-            databuilder.inject_noise(dataloader=databuilder.calibrate_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
-        
+        databuilder.train_loader = inject_noise(databuilder.train_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='train')
+        databuilder.valid_loader = inject_noise(databuilder.valid_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
+        databuilder.test_loader  = inject_noise(databuilder.test_loader,  f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
+        for k in databuilder.calibrate_loader_dict:
+            if k != 'lula':
+                databuilder.calibrate_loader_dict[k] = inject_noise(databuilder.calibrate_loader_dict[k], 
+                                                                    f_star = f_star.model, 
+                                                                    noise_type=noise_type, 
+                                                                    noise_strength=noise_strength, 
+                                                                    mode='eval')
+            
         return databuilder
 
     
@@ -104,18 +106,21 @@ class Environ():
         
         num_classes = int(self.config['data'][self.config['args']['dataset']]['N_CLASSES'])
         in_channels = int(self.config['data'][self.config['args']['dataset']]['N_CHANNELS'])
+        in_dim = None
         
         if 'mcdrop' in self.config['args']['method']:
             networkname = 'resnet18_mc'
         elif 'gp' in self.config['args']['method']:
             networkname = 'resnet18_gp'
+            in_dim = self.config['algorithm']['gp']['ENCODE_DIM']
         else:
             networkname = 'resnet18'
         
         networkbuilder = NetWorkBuilder(
             networkname = networkname, 
             num_classes = num_classes, 
-            in_channels = in_channels
+            in_channels = in_channels,
+            in_dim = in_dim
         )
         networkbuilder.create()
         
@@ -144,7 +149,7 @@ class Environ():
         return trainer
     
     
-    def create_calibrator(self) -> List[BaseCalibrator]:
+    def create_calibrator(self, databuilder: DataBuilder) -> List[BaseCalibrator]:
         
         methodname_list = self.config['args']['method'].split('+')
         calibrators = []
@@ -152,13 +157,16 @@ class Environ():
         
         for method in methodname_list:
             
+            calibrate_loader = databuilder.calibrate_loader_dict[method]
+            
             if method == 'raw':
-                calibrators.append(BaseCalibrator())
+                calibrators.append(BaseCalibrator(calibrate_loader))
             elif method in self._available_method:
                 if method in self.config['algorithm']:
                     calibrator_config.update({k:v for k,v in self.config['algorithm'][method].items()})    
                 module = importlib.import_module('calibrator.'+method)
-                calibrators.append(getattr(module, self._available_method[method])(config=calibrator_config))
+                calibrator = getattr(module, self._available_method[method])
+                calibrators.append(calibrator(calibrate_loader=calibrate_loader, config=calibrator_config))
             else:
                 raise NotImplementedError(f"Calibrator {method} is not defined !")
             

@@ -39,6 +39,10 @@ algorithm:
   bm:
     PRIOR:        !!float 1
     COEF:         !!float 0.01
+  gp:
+    ENCODE_DIM:   !!int   64
+  lula:
+    LR:           !!float 1e-2
 
 clean_model:
   mnist:

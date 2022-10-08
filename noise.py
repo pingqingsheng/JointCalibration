@@ -1,6 +1,44 @@
+#!/usr/bin/env python
+
 import torch
+from torch.nn import functional as F
 import numpy as np
 import copy
+
+def inject_noise(dataloader: torch.utils.data.DataLoader, 
+                 f_star: torch.nn.Module, 
+                 noise_type: str, 
+                 noise_strength: float, 
+                 mode: str = 'train') -> torch.utils.data.DataLoader:
+
+    eta_temp_pair = [(torch.softmax(f_star(images.to(f_star.device)), 1).detach().cpu(), indices) for _, (indices, images, _, _) in enumerate(dataloader)] 
+    eta_temp, eta_indices = torch.cat([x[0] for x in eta_temp_pair]), torch.cat([x[1] for x in eta_temp_pair]).squeeze()
+    
+    # ground truth eta
+    eta = eta_temp[eta_indices.argsort()]
+    f_star_outs = eta.argmax(1).squeeze()       
+
+    # inject noise and get eta_tilde
+    if noise_type=='rcn':
+        y_tilde, P, _ = noisify_with_P(np.array(copy.deepcopy(f_star_outs)), nb_classes=10, noise=noise_strength)
+        eta_tilde = np.matmul(F.one_hot(f_star_outs, num_classes=10), P)
+    elif noise_type=='idl':
+        y_tilde = [int(np.where(np.random.multinomial(1, np.clip(x, 1e-3, 0.999)/np.clip(x, 1e-3, 0.999).sum(), 1).squeeze())[0]) for x in np.array(eta)]
+        eta_tilde = copy.deepcopy(eta)
+    else:
+        raise NotImplementedError(f"Expecte the noise type to be in (rcn, idl), but got {noise_type}!")
+    dataloader.dataset.update_eta(eta_tilde)
+    
+    # corrupt labels
+    if mode == 'train':
+        dataloader.dataset.update_labels(y_tilde)
+    elif mode == 'eval':
+        dataloader.dataset.update_labels(f_star_outs)
+    else:
+        raise NotImplementedError(f"Expecte the mode to be in (train, eval), but got {mode}!")
+
+    return dataloader
+
 
 def perturb_eta(eta: torch.tensor, noise_type: str, noise_strength: float):
     eta_tilde = copy.deepcopy(eta)

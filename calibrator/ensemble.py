@@ -14,7 +14,7 @@ class Ensemble(BaseCalibrator):
         self.num_models = kwargs['config']['NUM_MODELS']
         self.device = kwargs['config']['device']
     
-    def forward(self, x):
+    def forward(self, x:torch.Tensor, **kwargs):
         
         ensemble_outs = 0
         for model in self.model_list: 

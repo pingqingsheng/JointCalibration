@@ -15,22 +15,25 @@ class MCDrop(BaseCalibrator):
         self.num_samples  = int(kwargs['config']['NUM_SAMPLES'])
         self.dropout_prob = float(kwargs['config']['DROPOUT_PROB']) 
         
-    def forward(self, x):
+    def forward(self, x:torch.Tensor, mode:str='train'):
         
-        b, c, w, h = x.shape
-        x_aug = x.unsqueeze(1).repeat(1, self.num_samples, 1, 1, 1)
-        x_aug = x_aug.reshape(-1, c, w, h)
-        n_aug = x_aug.shape[0]
-        n_iter = n_aug // len(x)
-        
-        dropout_outs = []
-        for ib in range(int(n_iter)):
-            outs = self.model(x_aug[ib*len(x):min(n_aug, (ib+1)*len(x))])
-            dropout_outs.append(outs.squeeze())
-        
-        dropout_outs = torch.cat(dropout_outs, 0).reshape(len(x), self.num_samples, -1).mean(1)
+        if mode == 'train':
+            outs = self.model(x)
+        elif mode == 'eval':
+            b, c, w, h = x.shape
+            x_aug = x.unsqueeze(1).repeat(1, self.num_samples, 1, 1, 1)
+            x_aug = x_aug.reshape(-1, c, w, h)
+            n_aug = x_aug.shape[0]
+            n_iter = n_aug // len(x)
+            
+            dropout_outs = []
+            for ib in range(int(n_iter)):
+                outs = self.model(x_aug[ib*len(x):min(n_aug, (ib+1)*len(x))])
+                dropout_outs.append(outs.squeeze())
+            
+            outs = torch.cat(dropout_outs, 0).reshape(len(x), self.num_samples, -1).mean(1)
 
-        return dropout_outs
+        return outs
     
     def pre_calibrate(self, 
                       model: torch.nn.Module, 

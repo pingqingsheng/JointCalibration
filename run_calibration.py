@@ -36,22 +36,21 @@ if __name__  == '__main__':
     dataset = envconfig.create_dataset()
     network = envconfig.create_network()
     trainer = envconfig.create_trainer()
-    calibrators = envconfig.create_calibrator()
+    calibrators = envconfig.create_calibrator(databuilder=dataset)
     
     os.environ['CUDA_VISIBLE_DEVICES'] = env['gpu']
     
     os.makedirs(env['checkpoint_dir'], exist_ok=True)
-    trainer.train(
+    model = trainer.train(
         model = network.model,
         trainloader = dataset.train_loader, 
         validloader = dataset.valid_loader, 
         testloader  = dataset.test_loader, 
-        calibrators = calibrators, 
-        calibrateloader = dataset.calibrate_loader
+        calibrators = calibrators
     )
     
-    result_dict = trainer.eval(
-        model = network.model, 
+    result_dict = trainer.eval( 
+        model = model, 
         testloader = dataset.test_loader
     )
     

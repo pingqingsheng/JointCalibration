@@ -16,7 +16,7 @@ from PIL import Image
 from ..datautils import download_url, check_integrity
 
 
-class CIFAR10(data.Dataset):
+class CIFAR10Base(data.Dataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
     Args:
         root (string): Root directory of dataset where directory
@@ -224,7 +224,7 @@ class CIFAR10(data.Dataset):
         self.eta = eta
 
 
-class CIFAR10_Combo(CIFAR10):
+class CIFAR10_Combo(CIFAR10Base):
 
     def __init__(self, root, exogeneous_var, split='train', train_ratio=0.8, trust_ratio=0.1,
                  transform=None, target_transform=None,
@@ -331,7 +331,7 @@ class CIFAR10_Combo(CIFAR10):
         return index, img, target, delta_eta, exogeneous_var
 
 
-class CIFAR100(CIFAR10):
+class CIFAR100(CIFAR10Base):
     """`CIFAR100 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
     This is a subclass of the `CIFAR10` Dataset.
     """
@@ -353,7 +353,7 @@ class CIFAR100(CIFAR10):
     }
 
 
-class CIFAR100_Combo(CIFAR10_Combo):
+class CIFAR100_Combo(CIFAR10Base):
 
     """`CIFAR100 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
     This is a subclass of the `CIFAR10` Dataset.
@@ -376,7 +376,7 @@ class CIFAR100_Combo(CIFAR10_Combo):
     }
 
 
-class CIFAR10_CSKD(CIFAR10):
+class CIFAR10(CIFAR10Base):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
     Args:
         root (string): Root directory of dataset where directory
@@ -506,7 +506,7 @@ class CIFAR10_CSKD(CIFAR10):
         return self.targets[indice]
 
 
-class CIFAR100_CSKD(CIFAR10_CSKD):
+class CIFAR100(CIFAR10):
     """`CIFAR100 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
     This is a subclass of the `CIFAR10` Dataset.
     """

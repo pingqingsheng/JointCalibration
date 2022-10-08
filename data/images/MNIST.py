@@ -39,7 +39,7 @@ def read_image_file(path):
         return torch.from_numpy(parsed).view(length, num_rows, num_cols)
 
 
-class MNIST(data.Dataset):
+class MNISTBase(data.Dataset):
     """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
     Args:
         root (string): Root directory of dataset where ``processed/training.pt``
@@ -210,7 +210,7 @@ class MNIST(data.Dataset):
         self.eta = eta
 
 
-class MNIST_Combo(MNIST):
+class MNIST_Combo(MNISTBase):
 
     def __init__(self, root, exogeneous_var, split='train', train_ratio=0.9, transform=None, target_transform=None, download=True):
         super().__init__()
@@ -274,7 +274,7 @@ class MNIST_Combo(MNIST):
         return index, img, target, eta, exogeneous_var
 
 
-class MNIST_CSKD(MNIST):
+class MNIST(MNISTBase):
     """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
     Args:
         root (string): Root directory of dataset where ``processed/training.pt``

@@ -9,14 +9,18 @@ class TemperatureScaling(BaseCalibrator):
         super(TemperatureScaling, self).__init__()
         
         self.device = kwargs['config']['device']
-        self.kwargs = kwargs
+        self.calibrate_loader = kwargs['calibrate_loader']
 
         self.temperature = 1.5*torch.ones(1).to(self.device)
         self.temperature.requires_grad_()
     
-    def forward(self, x):
+    def forward(self, x:torch.Tensor, mode:str='train'):
+        
         logits = self.model(x)
-        return self.temperature_scale(logits)
+        if mode == 'eval':
+            logits = self.temperature_scale(logits)
+            
+        return logits 
     
     def temperature_scale(self, logits):
         """
@@ -28,7 +32,6 @@ class TemperatureScaling(BaseCalibrator):
     
     def post_calibrate(self, 
                        optimizer: torch.optim.Optimizer, 
-                       calibrateloader: torch.utils.data.DataLoader, 
                        **kwargs) -> None:
         
         """
@@ -38,7 +41,7 @@ class TemperatureScaling(BaseCalibrator):
         """
         
         if isinstance(self.model, BaseCalibrator):
-            self.model.post_calibrate(optimizer, calibrateloader)
+            self.model.post_calibrate(optimizer)
         
         nll_criterion = torch.nn.CrossEntropyLoss()
 
@@ -46,7 +49,7 @@ class TemperatureScaling(BaseCalibrator):
         logits_list = []
         labels_list = []
         with torch.no_grad():
-            for _, input, label, _ in calibrateloader:
+            for _, input, label, _ in self.calibrate_loader:
                 input  = input.to(self.device)
                 logits = self.model(input)
                 logits_list.append(logits)

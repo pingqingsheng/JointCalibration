@@ -44,8 +44,7 @@ class Trainer():
               trainloader: torch.utils.data.DataLoader, 
               validloader: torch.utils.data.DataLoader, 
               testloader: torch.utils.data.DataLoader, 
-              calibrateloader: torch.utils.data.DataLoader, 
-              calibrators: List[BaseCalibrator]):
+              calibrators: List[BaseCalibrator]) -> torch.nn.Module:
     
         optimizer = torch.optim.SGD(
             model.parameters(), 
@@ -56,7 +55,7 @@ class Trainer():
         )
         
         for calibrator in calibrators:
-            model, optimizer = calibrator.pre_calibrate(model=model, optimizer=optimizer, calibrateloader=calibrateloader)
+            model, optimizer = calibrator.pre_calibrate(model=model, optimizer=optimizer)
         model = model.to(self.device)
         
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=self.n_epoch)
@@ -80,7 +79,7 @@ class Trainer():
             scheduler.step()
             self.metric_train.flush()
             
-            model.post_calibrate(optimizer=optimizer, calibrateloader=calibrateloader)
+            model.post_calibrate(optimizer=optimizer)
             
             if self.verbose and epoch%self.monitor_window==0:
                 
@@ -94,9 +93,10 @@ class Trainer():
                 tqdm.write(self.logging(self.metric_train, 'ece') +  '\t' + self.logging(self.metric_valid, 'ece')+ '\t' + self.logging(self.metric_test, 'ece'))
 
             if epoch%self.checkpoint_window==0:
-                torch.save(model, self.checkpoint_path)
-                
-            
+                torch.save(model.state_dict(), self.checkpoint_path)
+        
+        return model
+        
     @torch.no_grad()
     def eval(self, 
              model: torch.nn.Module, 
@@ -110,7 +110,7 @@ class Trainer():
         for _, (ind, images, labels, eta_tilde) in enumerate(testloader):
             
             images, labels = images.to(self.device), labels.to(self.device)
-            outs = model(images)
+            outs = model(images, mode='eval')
             loss = self.criterion_default(outs, labels)
             
             logger.update(outs.detach().cpu(), labels.detach().cpu(), loss.detach().cpu(), eta_tilde)

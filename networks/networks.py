@@ -231,9 +231,9 @@ class ResNet18_GP(nn.Module):
     def __init__(self, in_dim, in_channels, grid_bounds=(-10. , 10.), pretrained=False, **kwargs) -> None:
         super().__init__()
         self.encoder = ResNet18(num_classes=in_dim, in_channels=in_channels)
-        self.gp_layer = GaussianProcessLayer(num_dim=self.encoder.fc.out_features, grid_bounds=grid_bounds)
+        self.gp_layer = GaussianProcessLayer(num_dim=self.encoder.linear.out_features, grid_bounds=grid_bounds)
         self.grid_bounds = grid_bounds
-        self.num_dim = self.encoder.fc.out_features
+        self.num_dim = self.encoder.linear.out_features
         self.scaling = gpytorch.utils.grid.ScaleToBounds(self.grid_bounds[0], self.grid_bounds[1])
         
         if pretrained:
