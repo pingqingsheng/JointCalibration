@@ -1,14 +1,13 @@
 #!/usr/env/bin python
 
 from typing import List, MutableMapping
-from unittest import result
 
 import torch
 from tqdm import tqdm
 from datetime import datetime
 
 from calibrator.basecalibrator import BaseCalibrator
-from utils import AverageMeter
+from utils import AverageMeter, clean_grad
 
 class Trainer():
     
@@ -33,7 +32,6 @@ class Trainer():
         self.monitor_window = monitor_window
         self.device = device
         
-        self.criterion_default = torch.nn.CrossEntropyLoss()
         self.metric_train = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='train')
         self.metric_valid = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='valid')
         self.metric_test  = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='test')        
@@ -66,15 +64,15 @@ class Trainer():
             for _, (ind, images, labels, eta_tilde) in enumerate(trainloader):
                 
                 images, labels = images.to(self.device), labels.to(self.device)
-                outs = model(images)
-                loss = sum([calibrator.criterion(outs, labels) for calibrator in calibrators])
+                logits = model(images)
+                loss = sum([calibrator.criterion(logits, labels) for calibrator in calibrators])
                 
                 optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 optimizer.step()
                 
-                self.metric_train.update(outs.detach().cpu(), labels.detach().cpu(), loss.item(), eta_tilde)
+                self.metric_train.update(model.get_prob(logits).detach().cpu(), labels.detach().cpu(), loss.item(), eta_tilde)
             
             scheduler.step()
             self.metric_train.flush()
@@ -83,11 +81,11 @@ class Trainer():
             
             if self.verbose and epoch%self.monitor_window==0:
                 
-                self.eval(model, validloader, self.metric_valid)
-                self.eval(model, testloader,  self.metric_test)
+                self.eval(model, calibrators, validloader, self.metric_valid)
+                self.eval(model, calibrators, testloader,  self.metric_test)
                 
                 tqdm.write(30*"-" + f"[{int(self.n_epoch):3d}|{epoch+1:3d}]" + 30*"-")
-                tqdm.write(self.logging(self.metric_train, 'loss') + '\t'+ self.logging(self.metric_valid, 'loss')+ '\t'+ self.logging(self.metric_test, 'loss'))
+                tqdm.write(self.logging(self.metric_train, 'loss') + '\t' + self.logging(self.metric_valid, 'loss')+ '\t'+ self.logging(self.metric_test, 'loss'))
                 tqdm.write(self.logging(self.metric_train, 'l1')  +  '\t' + self.logging(self.metric_valid, 'l1') + '\t' + self.logging(self.metric_test, 'l1'))
                 tqdm.write(self.logging(self.metric_train, 'acc') +  '\t' + self.logging(self.metric_valid, 'acc')+ '\t' + self.logging(self.metric_test, 'acc'))
                 tqdm.write(self.logging(self.metric_train, 'ece') +  '\t' + self.logging(self.metric_valid, 'ece')+ '\t' + self.logging(self.metric_test, 'ece'))
@@ -100,6 +98,7 @@ class Trainer():
     @torch.no_grad()
     def eval(self, 
              model: torch.nn.Module, 
+             calibrators: List[BaseCalibrator],
              testloader: torch.utils.data.DataLoader, 
              logger:AverageMeter = None) -> MutableMapping:
         
@@ -110,10 +109,10 @@ class Trainer():
         for _, (ind, images, labels, eta_tilde) in enumerate(testloader):
             
             images, labels = images.to(self.device), labels.to(self.device)
-            outs = model(images, mode='eval')
-            loss = self.criterion_default(outs, labels)
+            logits = model(images, mode='eval')
+            loss = sum([calibrator.criterion(logits, labels) for calibrator in calibrators])
             
-            logger.update(outs.detach().cpu(), labels.detach().cpu(), loss.detach().cpu(), eta_tilde)
+            logger.update(model.get_prob(logits, mode='eval').detach().cpu(), labels.detach().cpu(), loss.detach().cpu(), eta_tilde)
         
         logger.flush()
         

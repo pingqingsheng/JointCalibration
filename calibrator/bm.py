@@ -1,5 +1,4 @@
 #!/usr/env/bin python
-from typing import Tuple
 
 import torch
 
@@ -9,21 +8,14 @@ from .basecalibrator import BaseCalibrator
 class BeliefMatching(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
 
         self.prior = kwargs['config']['PRIOR']
         self.coef  = kwargs['config']['COEF']
-        
-    def pre_calibrate(self, 
-                      model: torch.nn.Module, 
-                      optimizer: torch.optim.Optimizer, 
-                      **kwargs) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
-        
-        self.model = model
-        
-        return self, optimizer
     
-    def criterion(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        
+        logits = logits[:, :self.num_classes]
         
         alphas = torch.exp(logits)
         betas  = torch.ones_like(logits)*self.prior

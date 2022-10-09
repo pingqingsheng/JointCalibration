@@ -1,6 +1,6 @@
 #!/usr/env/bin python
 
-from typing import Tuple
+from typing import Tuple, Union
 
 import torch
 from torch.nn import functional as F
@@ -15,16 +15,15 @@ from .basecalibrator import BaseCalibrator
 class LULA(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
         
-        train_loader, valid_loader, calibrate_loader = kwargs['calibrate_loader']
+        train_loader, valid_loader, calibrate_loader = self.calibrate_loader
         self.num_train = len(train_loader.dataset)
         self.lr = kwargs['config']['LR']
         
         self.train_loader = train_loader
         self.valid_loader = valid_loader
         self.calibrate_loader = calibrate_loader
-        self.device = kwargs['config']['device']
         
     def pre_calibrate(self, 
                       model: torch.nn.Module, 
@@ -88,7 +87,10 @@ class LULA(BaseCalibrator):
         
         network.load_state_dict(best_network_statedict)
     
-    
+    @staticmethod
+    def loss(logits: torch.Tensor, targets: torch.Tensor, **kwargs) -> Union[torch.Tensor, int]:
+        return 0
+
 class MaskedLinear(torch.nn.Module):
     
     def __init__(self, base_layer, m_in, m_out, device=None):

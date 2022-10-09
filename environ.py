@@ -25,7 +25,8 @@ class Environ():
                          'focal': 'Focal', 
                          'bm': 'BeliefMatching', 
                          'gp': 'GP', 
-                         'lula': 'LULA'}
+                         'lula': 'LULA', 
+                         'ours': 'JointCalibration'}
     
     def __init__(self, config: MutableMapping) -> None:
         
@@ -153,18 +154,16 @@ class Environ():
         
         methodname_list = self.config['args']['method'].split('+')
         calibrators = []
-        calibrator_config = {'device':self.device}
+        calibrator_config = {'device':self.device, 'num_classes':self.config['data'][self.config['args']['dataset']]['N_CLASSES']}
         
         for method in methodname_list:
             
             calibrate_loader = databuilder.calibrate_loader_dict[method]
-            
-            if method == 'raw':
-                calibrators.append(BaseCalibrator(calibrate_loader))
-            elif method in self._available_method:
+
+            if method in self._available_method:
                 if method in self.config['algorithm']:
                     calibrator_config.update({k:v for k,v in self.config['algorithm'][method].items()})    
-                module = importlib.import_module('calibrator.'+method)
+                module = importlib.import_module('calibrator.'+method.replace('raw', 'basecalibrator'))
                 calibrator = getattr(module, self._available_method[method])
                 calibrators.append(calibrator(calibrate_loader=calibrate_loader, config=calibrator_config))
             else:

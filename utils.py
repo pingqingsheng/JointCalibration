@@ -1,6 +1,6 @@
 #!/usr/env/bin python
 
-from typing import List
+from typing import List, Union
 
 import torch
 from torch.nn import functional as F
@@ -36,13 +36,15 @@ class ECELoss(torch.nn.Module):
         self.reduction = reduction
         self.n_bins = n_bins
         
-    def forward(self, logits, labels):
-        softmaxes = F.softmax(logits, dim=1)
+    def forward(self, softmaxes, labels):
+        
+        assert all(torch.isclose(softmaxes.sum(1), torch.ones(len(softmaxes)).to(softmaxes.device))), 'softmaxes should all sum up to 1 !'
+        
         confidences, predictions = torch.max(softmaxes, 1)
         accuracies = predictions.eq(labels)
 
         if self.reduction == 'mean':
-            ece = torch.zeros(1, device=logits.device)
+            ece = torch.zeros(1, device=softmaxes.device)
             for bin_lower, bin_upper in zip(self.bin_lowers, self.bin_uppers):
                 # Calculated |confidence - accuracy| in each bin
                 in_bin = confidences.gt(bin_lower.item()) * confidences.le(bin_upper.item())
@@ -58,10 +60,9 @@ class ECELoss(torch.nn.Module):
             for bin_lower, bin_upper in zip(self.bin_lowers, self.bin_uppers):
                 # Calculated |confidence - accuracy| in each bin
                 in_bin = confidences.gt(bin_lower.item()) * confidences.le(bin_upper.item())
-                total_in_bin = in_bin.sum()
                 correct_in_bin = accuracies[in_bin].float().sum()
                 sum_confidence_in_bin = confidences[in_bin].sum()
-                bins.append((total_in_bin.item(), correct_in_bin.item(), sum_confidence_in_bin.item()))    
+                bins.append((correct_in_bin.item(), sum_confidence_in_bin.item()))    
             return bins
     
     
@@ -87,7 +88,10 @@ class AverageMeter():
             self.metric_dict[f'{metric}_count'] = 0
             self.metric_dict[f'{metric}_history'] = []
             
-    def update(self, outputs:torch.Tensor=None, labels:torch.Tensor=None, loss:torch.Tensor=None, eta_tilde:torch.Tensor=None):
+    def update(self, outputs:Union[torch.Tensor, torch.nn.Module]=None, labels:torch.Tensor=None, loss:torch.Tensor=None, eta_tilde:torch.Tensor=None):
+        
+        if not isinstance(outputs, torch.Tensor): # GP module
+            outputs = outputs.sample(32).mean(1)
         
         if (outputs is not None) and (labels is not None):    
             self.metric_dict['loss_val'] = float(((self.metric_dict['loss_val']*self.metric_dict['loss_count'])+self.criterion_ce(outputs, labels))/(self.metric_dict['loss_count']+len(outputs)))
@@ -97,11 +101,9 @@ class AverageMeter():
             
             new_ece_outcome = self.criterion_ece(outputs, labels)
             if self.metric_dict['ece_val'] == 0:
-                self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val']*self.metric_dict['ece_count']+new_ece_outcome[i][j])/(self.metric_dict['ece_count']+len(outputs)) 
-                                                for j in range(3)] for i in range(len(new_ece_outcome))]
+                self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val']+new_ece_outcome[i][j]) for j in range(2)] for i in range(len(new_ece_outcome))]
             else:
-                self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val'][i][j]*self.metric_dict['ece_count']+new_ece_outcome[i][j])/(self.metric_dict['ece_count']+len(outputs)) for j in range(3)]
-                                                for i in range(len(new_ece_outcome))]
+                self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val'][i][j]+new_ece_outcome[i][j]) for j in range(2)] for i in range(len(new_ece_outcome))]
             self.metric_dict['ece_count'] += len(outputs)
             
         if (outputs is not None) and (eta_tilde is not None):
@@ -120,8 +122,14 @@ class AverageMeter():
             if metric != 'ece':
                 self.metric_dict[f'{metric}_history'].append(self.metric_dict[f'{metric}_val'])   
             else:
-                ece = sum(abs(bin[1]-bin[2])*bin[0] for bin in self.metric_dict['ece_val'])
+                ece = sum(abs(bin[0]-bin[1])/self.metric_dict['ece_count'] for bin in self.metric_dict['ece_val'])
                 self.metric_dict[f'{metric}_history'].append(ece)
                 
             self.metric_dict[f'{metric}_val'] = 0
             self.metric_dict[f'{metric}_count'] = 0
+            
+            
+def clean_grad(model: torch.nn.Module) -> None:
+    for params in model.parameters():
+        if params.grad is not None:
+            params.grad = None

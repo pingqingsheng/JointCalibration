@@ -1,6 +1,5 @@
 #!/usr/env/bin python
-from typing import Tuple
-from numpy import isin
+from typing import Tuple, Union
 
 import torch
 
@@ -10,7 +9,7 @@ from .basecalibrator import BaseCalibrator
 class MCDrop(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
         
         self.num_samples  = int(kwargs['config']['NUM_SAMPLES'])
         self.dropout_prob = float(kwargs['config']['DROPOUT_PROB']) 
@@ -35,7 +34,7 @@ class MCDrop(BaseCalibrator):
 
         return outs
     
-    def pre_calibrate(self, 
+    def _pre_calibrate(self, 
                       model: torch.nn.Module, 
                       optimizer: torch.optim.Optimizer, 
                       **kwargs) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
@@ -50,5 +49,5 @@ class MCDrop(BaseCalibrator):
         return self, optimizer
     
     @staticmethod
-    def criterion(*args, **kwargs):
+    def loss(*args, **kwargs)-> Union[torch.Tensor, int]:
         return 0

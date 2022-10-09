@@ -24,5 +24,5 @@ class NetWorkBuilder():
             self.model = ResNet18_MC(num_classes=self.num_classes, in_channels=self.in_channels)
             
         elif self.networkname == 'resnet18_gp':
-            self.model = ResNet18_GP(in_dim=self.in_dim, in_channels=self.in_channels)
+            self.model = ResNet18_GP(num_class=self.num_classes, in_dim=self.in_dim, in_channels=self.in_channels)
                     

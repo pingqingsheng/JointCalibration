@@ -228,7 +228,7 @@ class ResNet18_GP(nn.Module):
         'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
     }
     
-    def __init__(self, in_dim, in_channels, grid_bounds=(-10. , 10.), pretrained=False, **kwargs) -> None:
+    def __init__(self, in_dim, in_channels, num_class, grid_bounds=(-10. , 10.), pretrained=False, **kwargs) -> None:
         super().__init__()
         self.encoder = ResNet18(num_classes=in_dim, in_channels=in_channels)
         self.gp_layer = GaussianProcessLayer(num_dim=self.encoder.linear.out_features, grid_bounds=grid_bounds)

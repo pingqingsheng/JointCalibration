@@ -1,4 +1,6 @@
 #!/usr/env/bin python
+from typing import Union, Tuple
+
 import torch
 
 from .basecalibrator import BaseCalibrator
@@ -6,10 +8,7 @@ from .basecalibrator import BaseCalibrator
 class TemperatureScaling(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
-        super(TemperatureScaling, self).__init__()
-        
-        self.device = kwargs['config']['device']
-        self.calibrate_loader = kwargs['calibrate_loader']
+        super().__init__(**kwargs)
 
         self.temperature = 1.5*torch.ones(1).to(self.device)
         self.temperature.requires_grad_()
@@ -18,7 +17,7 @@ class TemperatureScaling(BaseCalibrator):
         
         logits = self.model(x)
         if mode == 'eval':
-            logits = self.temperature_scale(logits)
+            logits[:, :self.num_classes] = self.temperature_scale(logits[:, :self.num_classes])
             
         return logits 
     
@@ -29,6 +28,7 @@ class TemperatureScaling(BaseCalibrator):
         # Expand temperature to match the size of logits
         temperature = self.temperature.unsqueeze(1).expand(logits.size(0), logits.size(1))
         return logits / temperature         
+        
     
     def post_calibrate(self, 
                        optimizer: torch.optim.Optimizer, 
@@ -52,7 +52,7 @@ class TemperatureScaling(BaseCalibrator):
             for _, input, label, _ in self.calibrate_loader:
                 input  = input.to(self.device)
                 logits = self.model(input)
-                logits_list.append(logits)
+                logits_list.append(logits[:, :self.num_classes])
                 labels_list.append(label)
             logits = torch.cat(logits_list).to(self.device)
             labels = torch.cat(labels_list).to(self.device)
@@ -79,5 +79,5 @@ class TemperatureScaling(BaseCalibrator):
         # print('After temperature - NLL: %.3f, ECE: %.3f' % (after_temperature_nll, after_temperature_ece))
         
     @staticmethod
-    def criterion(*args, **kwargs):
+    def criterion(*args, **kwargs) -> Union[torch.Tensor, int]:
         return 0

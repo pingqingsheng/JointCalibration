@@ -1,7 +1,5 @@
 #!/usr/env/bin python
 
-from typing import Tuple
-
 import torch
 from torch.nn import functional as F
 
@@ -11,7 +9,7 @@ from .basecalibrator import BaseCalibrator
 class Focal(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
-        super().__init__()
+        super().__init__(**kwargs)
         
         self.gamma = kwargs['config']['GAMMA']
         self.size_average = kwargs['config']['SIZE_AVERAGE']  
@@ -23,17 +21,10 @@ class Focal(BaseCalibrator):
         gamma_list[pt>=0.5] = self.gamma 
         
         return gamma_list
-    
-    def pre_calibrate(self, 
-                      model: torch.nn.Module, 
-                      optimizer: torch.optim.Optimizer, 
-                      **kwargs) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
         
-        self.model = model
+    def loss(self, logits:torch.Tensor, target:torch.Tensor):
         
-        return self, optimizer
-        
-    def criterion(self, logits:torch.Tensor, target:torch.Tensor):
+        logits = logits[:, :self.num_classes]
         
         if logits.dim() > 2:
             logits = logits.view(logits.size(0),logits.size(1),-1)  # N,C,H,W => N,C,H*W
