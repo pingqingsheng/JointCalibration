@@ -52,7 +52,8 @@ if __name__  == '__main__':
     result_dict = trainer.eval( 
         model = model, 
         calibrators = calibrators, 
-        testloader  = dataset.test_loader
+        testloader  = dataset.test_loader, 
+        logger = trainer.metric_test
     )
     
     # Save result

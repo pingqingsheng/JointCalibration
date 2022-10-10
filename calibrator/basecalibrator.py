@@ -49,6 +49,7 @@ class BaseCalibrator(torch.nn.Module):
             for i in range(len(logits)):
                 logits_i = logits[i]
                 loss +=  self.loss(logits_i, targets)
+            loss /= len(logits)
         else:
             logits = logits
             loss = self.loss(logits, targets)

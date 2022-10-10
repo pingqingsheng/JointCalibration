@@ -33,12 +33,10 @@ class TemperatureScaling(BaseCalibrator):
     def post_calibrate(self, 
                        optimizer: torch.optim.Optimizer, 
                        **kwargs) -> None:
-        
-        """
-        Tune the tempearature of the model (using the validation set).
-        We're going to set it to optimize NLL.
-        valid_loader (DataLoader): validation set loader
-        """
+        # """Tune the tempearature of the model (using the validation set).
+        # We're going to set it to optimize NLL.
+        # valid_loader (DataLoader): validation set loader
+        # """
         
         if isinstance(self.model, BaseCalibrator):
             self.model.post_calibrate(optimizer)
@@ -79,5 +77,5 @@ class TemperatureScaling(BaseCalibrator):
         # print('After temperature - NLL: %.3f, ECE: %.3f' % (after_temperature_nll, after_temperature_ece))
         
     @staticmethod
-    def criterion(*args, **kwargs) -> Union[torch.Tensor, int]:
+    def loss(*args, **kwargs) -> Union[torch.Tensor, int]:
         return 0

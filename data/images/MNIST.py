@@ -385,7 +385,9 @@ class PairBatchSampler(Sampler):
 if __name__ == "__main__":
 
     from typing import List
-
+    import sys
+    sys.path.append("/home/songzhu/JointCalibration")
+    
     import torch
     import torch.nn.functional as F
     from torch.utils.data import DataLoader
@@ -398,18 +400,17 @@ if __name__ == "__main__":
     from termcolor import cprint
 
     from data.images.MNIST import MNIST
-    from network.network import resnet18
-    from utils.utils import _init_fn
-
+    from networks.networks import ResNet18
+    
     # Experiment Setting Control Panel
     SEED: int = 123
-    N_EPOCH: int = 8
-    LR: float = 1e-6
-    WEIGHT_DECAY: float = 1e-2
-    BATCH_SIZE: int = 128
-    SCHEDULER_DECAY_MILESTONE: List = [20, 40, 60]
+    N_EPOCH: int = 5
+    LR: float = 3.5e-6
+    WEIGHT_DECAY: float = 5e-2
+    BATCH_SIZE: int = 256
+    SCHEDULER_DECAY_MILESTONE: List = [10, 15]
     TRAIN_VALIDATION_RATIO: float = 0.8
-    MONITOR_WINDOW: int = 2
+    MONITOR_WINDOW: int = 1
     GPU_IND: str = "0"
 
     seed = SEED
@@ -421,7 +422,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True  # need to set to True as well
 
     os.environ['CUDA_VISIBLE_DEVICES'] = GPU_IND
-    device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+    device = torch.device(f"cuda:{GPU_IND}" if torch.cuda.is_available() else 'cpu')
 
     # Data Loading and Processing
     transform_train = transforms.Compose([
@@ -432,21 +433,20 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
     ])
-    trainset = MNIST(root="./data", split="train", train_ratio=TRAIN_VALIDATION_RATIO, download=True, transform=transform_train)
-    validset = MNIST(root="./data", split="valid", train_ratio=TRAIN_VALIDATION_RATIO, download=True, transform=transform_train)
-    testset  = MNIST(root='./data', split="test", download=True, transform=transform_test)
+    trainset = MNIST(root="/home/songzhu/JointCalibration/download", split="train", train_ratio=TRAIN_VALIDATION_RATIO, download=True, transform=transform_train)
+    validset = MNIST(root="/home/songzhu/JointCalibration/download", split="valid", train_ratio=TRAIN_VALIDATION_RATIO, download=True, transform=transform_train)
+    testset  = MNIST(root='/home/songzhu/JointCalibration/download', split="test", download=True, transform=transform_test)
     # model_cls_clean = torch.load("./data/CIFAR10_resnet18_clean.pth")
 
-    train_loader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, worker_init_fn=_init_fn(worker_id=seed))
-    valid_loader = DataLoader(validset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, worker_init_fn=_init_fn(worker_id=seed))
-    test_loader = DataLoader(testset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, worker_init_fn=_init_fn(worker_id=seed))
+    train_loader = DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+    valid_loader = DataLoader(validset, batch_size=4*BATCH_SIZE, shuffle=False, num_workers=2)
+    test_loader = DataLoader(testset, batch_size=4*BATCH_SIZE, shuffle=False, num_workers=2)
 
-    model_cls = resnet18(num_classes=10, in_channels=1)
-    model_cls = DataParallel(model_cls)
+    model_cls = ResNet18(num_classes=10, in_channels=1)
     model_cls = model_cls.to(device)
 
-    optimizer_cls = torch.optim.Adam(model_cls.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
-    scheduler_cls = torch.optim.lr_scheduler.MultiStepLR(optimizer_cls, gamma=0.5, milestones=SCHEDULER_DECAY_MILESTONE)
+    optimizer_cls = torch.optim.SGD(model_cls.parameters(), lr=LR, weight_decay=WEIGHT_DECAY, momentum=0.9, nesterov=True)
+    scheduler_cls = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer_cls, T_max=20)
 
     criterion_cls = torch.nn.CrossEntropyLoss()
 
@@ -507,7 +507,7 @@ if __name__ == "__main__":
     cprint(f"Classification Test Acc: {test_correct / test_total:7.3f}", "cyan")
 
     # Save clean model
-    model_file_name = "MNIST_resnet18_clean.pth"
+    model_file_name = "/home/songzhu/JointCalibration/clean_model/MNIST_resnet18_noise40.pth"
     torch.save(model_cls, model_file_name)
     
     

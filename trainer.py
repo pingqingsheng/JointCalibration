@@ -124,5 +124,6 @@ class Trainer():
         
     @staticmethod
     def logging(meter:AverageMeter, metric:str):
-        return f'{meter.name:5s}_{metric:4s}: {meter.get(metric):.3f}'
+        result = meter.get(metric)
+        return f'{meter.name:5s}_{metric:4s}: {result:.3f}'
     

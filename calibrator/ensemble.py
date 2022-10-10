@@ -43,6 +43,10 @@ class Ensemble(BaseCalibrator):
         while isinstance(network, BaseCalibrator):
             network = network.model
         
+        if hasattr(self.model, 'likelihood'): # GP module
+            self.common_likelihood = self.model.likelihood
+            self.common_gplayer = network.gp_layer
+        
         self.model_list = []
         exist_dataptr = set([x.data_ptr() for x in optimizer.param_groups[0]['params']])
         
@@ -55,12 +59,14 @@ class Ensemble(BaseCalibrator):
             
             if hasattr(model_i, 'likelihood'):
                 # share likelihood and gp-layer
-                model_i.likelihood = self.model.likelihood        
-                model_i.model.gp_layer = network.gp_layer 
+                model_i.likelihood = self.common_likelihood  
+                model_i.model.gp_layer = self.common_gplayer
                 self.model_list.append(model_i.to(self.device))
                 optimizer = model_i.update_optimizer(model_i.model, optimizer, self.model.likelihood)
             else:
-                optimizer.add_param_group({'params': [x for x in model_i.parameters() if x.data_ptr() not in exist_dataptr]})
+                orig_lr = optimizer.param_groups[0]['lr']
+                orig_weightdecay = optimizer.param_groups[0]['weight_decay']
+                optimizer.add_param_group({'params': [x for x in model_i.parameters() if x.data_ptr() not in exist_dataptr], 'lr':orig_lr, 'weight_decay':orig_weightdecay})
                 self.model_list.append(model_i.to(self.device))
                 
         return self, optimizer

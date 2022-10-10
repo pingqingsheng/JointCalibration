@@ -16,7 +16,7 @@ train:
     LR: !!float 1e-2
     WEIGHT_DECAY: !!float 5e-3
     BATCH_SIZE: !!int 128
-    MILE_STONE: !!seq [40, 80, 120]
+    MILE_STONE: !!seq [20, 30]
   cifar10:
     N_EPOCHS: !!int 3
     LR: !!float 1e-2
@@ -26,7 +26,7 @@ train:
 
 algorithm:
   ensemble:
-    NUM_MODELS:   !!int 2
+    NUM_MODELS:   !!int 5
   mcdrop:
     NUM_SAMPLES:  !!int 3
     DROPOUT_PROB: !!float 0.5

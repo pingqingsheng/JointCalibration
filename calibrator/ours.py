@@ -52,10 +52,10 @@ class JointCalibration(BaseCalibrator):
         if hasattr(self.model, 'model_list'): # Ensemble Module
             for i in range(len(self.model.model_list)):
                 self.model.model_list[i], optimizer = self.augment_network(self.model.model_list[i], optimizer, self.device)
-            if hasattr(self.model.model_list[0], 'likelihood'): # share likelihood
-                common_likelihood = self.model.model_list[0].likelihood
-                for i in range(len(self.model.model_list)):
-                    self.model.model_list[i].likelihood = common_likelihood
+                if hasattr(self.model.model_list[i], 'likelihood'): # TODO: rewrite this part.  After augmenting a GP layer, re-assign common likelihood and gplayer
+                    self.model.model_list[i].likelihood = self.model.common_likelihood
+                    self.model.model_list[i].model.gp_layer = self.model.common_gplayer
+                    # optimizer = self.model.model_list[i].update_optimizer(self.model.model_list[i].model, optimizer, self.model.model_list[i].likelihood)
         else:
             self.model, optimizer = self.augment_network(self.model, optimizer, self.device)
 
@@ -68,16 +68,18 @@ class JointCalibration(BaseCalibrator):
         while isinstance(network, BaseCalibrator):
             network = network.model
         
-        if hasattr(model, 'likelihood'): # for GP module
+        if hasattr(model, 'likelihood'): # augment GP module
             in_features, out_features = model.likelihood.num_features, model.likelihood.num_classes
             layer_module   = getattr(importlib.import_module(model.likelihood.__class__.__module__), model.likelihood.__class__.__name__)
             model.likelihood = layer_module(in_features, out_features+1).to(device)
             optimizer = model.update_optimizer(model.model, optimizer, model.likelihood)
         else:
+            orig_lr = optimizer.param_groups[0]['lr']
+            orig_weightdecay = optimizer.param_groups[0]['weight_decay']
             in_features, out_features = network.linear.in_features, network.linear.out_features
             layer_module   = getattr(importlib.import_module(network.linear.__class__.__module__), network.linear.__class__.__name__)
             network.linear = layer_module(in_features, out_features+1).to(device)
-            optimizer.add_param_group({'params':[x for x in network.linear.parameters()]})
+            optimizer.add_param_group({'params':[x for x in network.linear.parameters()], 'lr':orig_lr, 'weight_decay':orig_weightdecay})
 
         return model, optimizer
         

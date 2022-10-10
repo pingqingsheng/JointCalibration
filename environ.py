@@ -46,7 +46,7 @@ class Environ():
         torch.backends.cudnn.deterministic = True
         
         gpu = self.config['args']['gpu']
-        self.device = torch.device(f'cuda:{gpu}' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
         
         environ['gpu'] = gpu
         environ['result_dir'] = self.config['args']['result_dir']
@@ -73,29 +73,22 @@ class Environ():
         noise_type = self.config['args']['noise_type']
         noise_strength = float(self.config['args']['noise_strength'])
         
-        #>>> TODO: remake the clean model
         clean_model_path = self.config['clean_model'][self.config['args']['dataset']]['PATH']
         if noise_type == 'idl':
-            clean_model_path = '.'+clean_model_path.split('.')[1]+f'_{int(noise_strength*100)}.pth'
-
-        f_star = NetWorkBuilder(networkname='resnet18', num_classes=10, in_channels=self.config['data'][self.config['args']['dataset']]['N_CHANNELS'])
-        f_star.create()
-        orig_state_dict  = f_star.model.state_dict()
-        clean_state_dict = {k.replace('module.', '').replace('downsample', 'shortcut').replace('fc', 'linear'):v for k, v in torch.load(clean_model_path).items()}
-        clean_state_dict = {k:v for k, v in clean_state_dict.items() if (k in orig_state_dict) and (v.shape==orig_state_dict[k].shape)}
-        orig_state_dict.update(clean_state_dict)
-        f_star.model.load_state_dict(orig_state_dict)
-        f_star.model = f_star.model.to(self.device)
-        setattr(f_star.model, 'device', self.device)
-        # <<<
+            clean_model_folder = '/'.join(clean_model_path.split('/')[:-1])
+            clean_model_path   = clean_model_path.split('/')[-1].replace('_clean.pth', f'_noise{int(noise_strength*100)}.pth')
+            clean_model_path   = os.path.join(clean_model_folder, clean_model_path)
+            
+        f_star = torch.load(clean_model_path).to(self.device)
+        setattr(f_star, 'device', self.device)
         
-        databuilder.train_loader = inject_noise(databuilder.train_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='train')
-        databuilder.valid_loader = inject_noise(databuilder.valid_loader, f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
-        databuilder.test_loader  = inject_noise(databuilder.test_loader,  f_star=f_star.model, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
+        databuilder.train_loader = inject_noise(databuilder.train_loader, f_star=f_star, noise_type=noise_type, noise_strength=noise_strength, mode='train')
+        databuilder.valid_loader = inject_noise(databuilder.valid_loader, f_star=f_star, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
+        databuilder.test_loader  = inject_noise(databuilder.test_loader,  f_star=f_star, noise_type=noise_type, noise_strength=noise_strength, mode='eval')
         for k in databuilder.calibrate_loader_dict:
             if k != 'lula':
                 databuilder.calibrate_loader_dict[k] = inject_noise(databuilder.calibrate_loader_dict[k], 
-                                                                    f_star = f_star.model, 
+                                                                    f_star = f_star, 
                                                                     noise_type=noise_type, 
                                                                     noise_strength=noise_strength, 
                                                                     mode='eval')

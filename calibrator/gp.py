@@ -15,7 +15,6 @@ class GP(BaseCalibrator):
         super().__init__(**kwargs)
         
         self.num_data  = len(kwargs['calibrate_loader'].dataset)
-        self.num_class = len(torch.unique(torch.tensor(kwargs['calibrate_loader'].dataset.targets)))
         self.encode_dim = kwargs['config']['ENCODE_DIM']
         
     def forward(self, x:torch.Tensor, mode='train', **kwargs):
@@ -35,7 +34,7 @@ class GP(BaseCalibrator):
                 pred_prob /= len(logits)
             else:
                 pred_prob = self.likelihood(logits).probs.mean(0)
-        return pred_prob[:, :self.num_class]
+        return pred_prob[:, :self.num_classes]
     
 
     def pre_calibrate(self, 
@@ -50,7 +49,7 @@ class GP(BaseCalibrator):
             network = network.model
         self.network = network
         
-        self.likelihood = gpytorch.likelihoods.SoftmaxLikelihood(num_features=self.encode_dim, num_classes=self.num_class).to(self.device)
+        self.likelihood = gpytorch.likelihoods.SoftmaxLikelihood(num_features=self.encode_dim, num_classes=self.num_classes).to(self.device)
         optimizer = self.update_optimizer(self.network, optimizer, self.likelihood)
         
         return self, optimizer
@@ -64,13 +63,13 @@ class GP(BaseCalibrator):
         gp_hyperparams = [x for x in network.gp_layer.hyperparameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
         gp_viparams    = [x for x in network.gp_layer.variational_parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
         ll_params      = [x for x in likelihood.parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
-        other_params   = [x for x in network.parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params+ll_params]]
+        other_params   = [x for x in network.encoder.parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
         
         if len(gp_hyperparams):
             optimizer.add_param_group({'params':gp_hyperparams, 'lr':backbone_lr*0.01, 'weight_decay':0})
         if len(gp_viparams):
-            optimizer.add_param_group({'params':gp_viparams, 'weight_decay':0})
-        if len(ll_params + other_params):
+            optimizer.add_param_group({'params':gp_viparams,    'lr':backbone_lr,      'weight_decay':0})
+        if len(orig_params+ll_params+other_params):
             optimizer.param_groups[0].update({'params': orig_params+ll_params+other_params})
         
         return optimizer
