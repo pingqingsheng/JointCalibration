@@ -12,13 +12,13 @@ data:
 
 train:
   mnist: 
-    N_EPOCHS: !!int 3
+    N_EPOCHS: !!int 40
     LR: !!float 1e-2
     WEIGHT_DECAY: !!float 5e-3
     BATCH_SIZE: !!int 128
     MILE_STONE: !!seq [20, 30]
   cifar10:
-    N_EPOCHS: !!int 3
+    N_EPOCHS: !!int 200
     LR: !!float 1e-2
     WEIGHT_DECAY: !!float 5e-3
     BATCH_SIZE: !!int 128
