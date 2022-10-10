@@ -26,8 +26,8 @@ class TemperatureScaling(BaseCalibrator):
         Perform temperature scaling on logits
         """
         # Expand temperature to match the size of logits
-        temperature = self.temperature.unsqueeze(1).expand(logits.size(0), logits.size(1))
-        return logits / temperature         
+        # temperature = self.temperature.unsqueeze(1).expand(logits.size(0), logits.size(1))
+        return logits / self.temperature         
         
     
     def post_calibrate(self, 
@@ -46,6 +46,7 @@ class TemperatureScaling(BaseCalibrator):
         # First: collect all the logits and labels for the validation set
         logits_list = []
         labels_list = []
+        self.model.eval()
         with torch.no_grad():
             for _, input, label, _ in self.calibrate_loader:
                 input  = input.to(self.device)
