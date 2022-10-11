@@ -2,7 +2,7 @@
 
 import torch
 from torch.nn import functional as F
-from torch.utils.data import BatchSampler, RandomSampler, DataLoader
+from torch.utils.data import  DataLoader
 import numpy as np
 import copy
 
@@ -25,6 +25,9 @@ def inject_noise(dataloader: torch.utils.data.DataLoader,
     if noise_type=='rcn':
         y_tilde, P, _ = noisify_with_P(np.array(copy.deepcopy(f_star_outs)), nb_classes=10, noise=noise_strength)
         eta_tilde = np.matmul(F.one_hot(f_star_outs, num_classes=10), P)
+    elif noise_type=='linear':
+        eta_tilde = perturb_eta(eta, noise_type, noise_strength)
+        y_tilde = [int(np.where(np.random.multinomial(1, np.clip(x, 1e-3, 0.999)/np.clip(x, 1e-3, 0.999).sum(), 1).squeeze())[0]) for x in eta_tilde]
     elif noise_type=='idl':
         y_tilde = [int(np.where(np.random.multinomial(1, np.clip(x, 1e-3, 0.999)/np.clip(x, 1e-3, 0.999).sum(), 1).squeeze())[0]) for x in np.array(eta)]
         eta_tilde = copy.deepcopy(eta)

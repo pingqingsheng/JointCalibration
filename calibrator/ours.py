@@ -4,6 +4,7 @@ from typing import Tuple, Union, List
 import importlib
 
 import torch
+from torch.utils.data import BatchSampler, RandomSampler
 
 from .basecalibrator import BaseCalibrator
 
@@ -107,7 +108,8 @@ class JointCalibrationV2(JointCalibration):
         
         self.model = model
         
-        calibrate_loader_sampler = self.calibrate_loader.sampler
+        calibrate_sampler = lambda x : BatchSampler(RandomSampler(x, num_samples=int(0.8*x)), batch_size=self.calibrate_loader.batch_size)
+        self.calibrate_loader = torch.utils.data.DataLoader(self.calibrate_loader.dataset, sampler=calibrate_sampler)
         
         if hasattr(self.model, 'model_list'): # Ensemble Module
             for i in range(len(self.model.model_list)):
