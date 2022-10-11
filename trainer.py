@@ -7,7 +7,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from calibrator.basecalibrator import BaseCalibrator
-from utils import AverageMeter, clean_grad
+from utils import AverageMeter
 
 class Trainer():
     
@@ -43,7 +43,9 @@ class Trainer():
               validloader: torch.utils.data.DataLoader, 
               testloader: torch.utils.data.DataLoader, 
               calibrators: List[BaseCalibrator]) -> torch.nn.Module:
-    
+
+        self.batch_size = trainloader.batch_size
+        
         optimizer = torch.optim.SGD(
             model.parameters(), 
             lr = self.lr,
@@ -69,11 +71,16 @@ class Trainer():
                 
                 optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+                # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 optimizer.step()
                 
                 self.metric_train.update(model.get_prob(logits).detach().cpu(), labels.detach().cpu(), loss.item(), eta_tilde)
-            
+                
+                # import matplotlib.pyplot as plt
+                # plt.imshow(images[3].detach().cpu().permute(1,2,0).repeat(1,1,3))
+                # plt.title(f'Image Class: {labels[3].detach().cpu():2d}')
+                # plt.savefig('./figures/image_sample.png')
+                
             scheduler.step()
             self.metric_train.flush()
             

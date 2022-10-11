@@ -5,9 +5,10 @@ from torch.utils.data import DataLoader, Sampler, BatchSampler, RandomSampler
 from torchvision import transforms
 import copy
 
-from data.images.MNIST import MNIST, PairBatchSampler
+from data.images.MNIST import MNIST
 from data.images.CIFAR import CIFAR10
 from data.images.ImageNet32 import ImageNet32Dataset
+from data.datautils import PairBatchSampler
 
 class DataBuilder():
     
@@ -18,7 +19,9 @@ class DataBuilder():
         self.batch_size  = batch_size 
         self.methodname_list = methodname_list
         self.calibrate_loader_dict = {}
-        
+    
+    #TODO: transfer all these method conditioned operation to pre_calibration
+    
     @staticmethod
     def get_dataset(dataset_name: str) -> Callable:
         
@@ -90,22 +93,28 @@ class DataBuilder():
         return transform_train, transform_test   
     
     @staticmethod
-    def get_sampler(dataset_name: str, batch_size:int) -> Sampler:
+    def get_sampler(method_list: List, batch_size:int) -> Sampler:
         
-        if 'cskd' in dataset_name:
-            return lambda x: PairBatchSampler(x, batch_size=batch_size)
+        if 'cskd' in method_list:
+            if 'oursv2' in method_list:
+                return lambda x: PairBatchSampler(x, num_samples=int(0.8*len(x)), batch_size=batch_size)
+            else:
+                return lambda x: PairBatchSampler(x, batch_size=batch_size)
         else:
-            return lambda x: BatchSampler(RandomSampler(x), batch_size=batch_size, drop_last=False)
+            if 'oursv2' in method_list:
+                return lambda x: BatchSampler(RandomSampler(x, num_samples=int(0.8*len(x))), batch_size=batch_size, drop_last=False)
+            else:
+                return lambda x: BatchSampler(RandomSampler(x), batch_size=batch_size, drop_last=False)
     
     def create(self):
         
         dataset = self.get_dataset(self.datasetname)
         transform_train, transform_test = self.get_transform(self.datasetname)
-        sampler = self.get_sampler(self.datasetname, batch_size=self.batch_size)
+        sampler = self.get_sampler(self.methodname_list, batch_size=self.batch_size)
         
         self.trainset = dataset(root="./download", split="train", train_ratio=self.train_ratio, download=True, transform=transform_train)
         self.validset = dataset(root="./download", split="valid", train_ratio=self.train_ratio, download=True, transform=transform_test)
-        self.testset  = dataset(root='./download', split="test", download=True, transform=transform_test)
+        self.testset  = dataset(root='./download', split="test",  download=True, transform=transform_test)
         
         self.train_loader = DataLoader(self.trainset, batch_sampler=sampler(self.trainset), num_workers=1)
         self.valid_loader = DataLoader(self.validset, batch_size=self.batch_size, shuffle=False, num_workers=1)

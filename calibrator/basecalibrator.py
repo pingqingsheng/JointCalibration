@@ -23,7 +23,6 @@ class BaseCalibrator(torch.nn.Module):
     
     def get_prob(self, logits:torch.Tensor, **kwargs) -> torch.Tensor:
         return torch.softmax(logits[:, :self.num_classes], 1)
-    
             
     def pre_calibrate(self, 
                       model: torch.nn.Module, 

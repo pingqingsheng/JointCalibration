@@ -13,8 +13,6 @@ class CSKD(BaseCalibrator):
         self.temperature = kwargs['config']['TEMPERATURE']
         self.lamda = kwargs['config']['LAMBDA']
 
-        self.criterion_ce = torch.nn.CrossEntropyLoss()
-    
     def loss(self, logits:torch.Tensor, labels:torch.Tensor, **kwargs):
         
         logits = logits[:, :self.num_classes]
@@ -23,7 +21,7 @@ class CSKD(BaseCalibrator):
         labels = labels[:n_images//2]
         logits, logits_tilde = logits[:n_images//2, :self.num_classes], logits[(n_images//2):, :self.num_classes]
         
-        return self.criterion_ce(logits, labels) + self.kdloss(logits, logits_tilde)
+        return torch.nn.functional.cross_entropy(logits, labels) + self.lamda*self.kdloss(logits, logits_tilde)
     
     @staticmethod
     def kdloss(inputs: torch.Tensor, targets: torch.Tensor, temperature: float=1):

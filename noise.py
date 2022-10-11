@@ -2,6 +2,7 @@
 
 import torch
 from torch.nn import functional as F
+from torch.utils.data import BatchSampler, RandomSampler, DataLoader
 import numpy as np
 import copy
 
@@ -11,7 +12,9 @@ def inject_noise(dataloader: torch.utils.data.DataLoader,
                  noise_strength: float, 
                  mode: str = 'train') -> torch.utils.data.DataLoader:
 
-    eta_temp_pair = [(torch.softmax(f_star(images.to(f_star.device)), 1).detach().cpu(), indices) for _, (indices, images, _, _) in enumerate(dataloader)] 
+    # use default random sampler 
+    tempdataloader = DataLoader(dataloader.dataset, batch_size=128)
+    eta_temp_pair = [(torch.softmax(f_star(images.to(f_star.device)), 1).detach().cpu(), indices) for _, (indices, images, _, _) in enumerate(tempdataloader)] 
     eta_temp, eta_indices = torch.cat([x[0] for x in eta_temp_pair]), torch.cat([x[1] for x in eta_temp_pair]).squeeze()
     
     # ground truth eta

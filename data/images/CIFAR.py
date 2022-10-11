@@ -8,16 +8,11 @@ from collections import defaultdict
 
 import torch
 import torch.utils.data as data
-from torch.utils.data import Sampler
 import numpy as np
 import pickle
 from PIL import Image
 
-# from ..datautils import download_url, check_integrity
-
-import sys
-sys.path.append("/home/songzhu/JointCalibration/data")
-from datautils import download_url, makedir_exist_ok, check_integrity
+from ..datautils import download_url, check_integrity
 
 class CIFAR10Base(data.Dataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
@@ -508,6 +503,12 @@ class CIFAR10(CIFAR10Base):
     def get_class(self, indice):
         return self.targets[indice]
 
+    def update_labels(self, new_label):
+        self.targets[:] = new_label[:]
+        self.classwise_indices = defaultdict(list)
+        for i in range(len(self)):
+            y = self.targets[i]
+            self.classwise_indices[y].append(i)
 
 class CIFAR100(CIFAR10):
     """`CIFAR100 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
@@ -529,37 +530,6 @@ class CIFAR100(CIFAR10):
         'key': 'fine_label_names',
         'md5': '7973b15100ade9c7d40fb424638fde48',
     }
-
-
-class PairBatchSampler(Sampler):
-    def __init__(self, dataset, batch_size, num_iterations=None):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.num_iterations = num_iterations
-
-    def __iter__(self):
-        indices = list(range(len(self.dataset)))
-        random.shuffle(indices)
-        for k in range(len(self)):
-            if self.num_iterations is None:
-                offset = k*self.batch_size
-                batch_indices = indices[offset:offset+self.batch_size]
-            else:
-                batch_indices = random.sample(range(len(self.dataset)), self.batch_size)
-            pair_indices = []
-            for idx in batch_indices:
-                y = self.dataset.get_class(idx)
-                pair_indices.append(random.choice(self.dataset.classwise_indices[y]))
-            yield batch_indices + pair_indices
-
-    def __len__(self):
-        if self.num_iterations is None:
-            return (len(self.dataset)+self.batch_size-1) // self.batch_size
-        else:
-            return self.num_iterations
-
-
-
 
 # Train model with clean examples to generate IDL synthetic dataset
 if __name__ == "__main__":

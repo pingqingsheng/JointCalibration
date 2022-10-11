@@ -5,7 +5,6 @@ from collections import defaultdict
 
 import torch
 import torch.utils.data as data
-from torch.utils.data import Sampler
 import numpy as np
 from PIL import Image
 import gzip
@@ -349,36 +348,13 @@ class MNIST(MNISTBase):
     def get_class(self, indice):
         return self.targets[indice]
 
-
-class PairBatchSampler(Sampler):
-    def __init__(self, dataset, batch_size, num_iterations=None, **kwargs):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.num_iterations = num_iterations
-
-    def __iter__(self):
-        indices = list(range(len(self.dataset)))
-        random.shuffle(indices)
-        for k in range(len(self)):
-            if self.num_iterations is None:
-                offset = k*self.batch_size
-                batch_indices = indices[offset:offset+self.batch_size]
-            else:
-                batch_indices = random.sample(range(len(self.dataset)), self.batch_size)
-            pair_indices = []
-            for idx in batch_indices:
-                y = self.dataset.get_class(idx)
-                pair_indices.append(random.choice(self.dataset.classwise_indices[y]))
-            yield batch_indices + pair_indices
-
-    def __len__(self):
-        if self.num_iterations is None:
-            return (len(self.dataset)+self.batch_size-1) // self.batch_size
-        else:
-            return self.num_iterations
-
-
-
+    def update_labels(self, new_label):
+        self.targets[:] = new_label[:]
+        
+        self.classwise_indices = defaultdict(list)
+        for i in range(len(self)):
+            y = self.targets[i]
+            self.classwise_indices[y].append(i)
 
 
 # Train model with clean examples to generate IDL synthetic dataset

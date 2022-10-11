@@ -1,11 +1,12 @@
 import os
 import os.path
 
+from torch.utils.data import Sampler
 import hashlib
 import errno
 from tqdm import tqdm
 import numpy as np
-
+import random
 
 def _init_fn(worker_id):
     np.random.seed(77 + worker_id)
@@ -144,4 +145,32 @@ def check_folder(save_dir):
 # random seed related
 def init_fn_(worker_id):
     np.random.seed(77 + worker_id)
-    
+
+
+
+class PairBatchSampler(Sampler):
+    def __init__(self, dataset, batch_size, num_samples=None, **kwargs):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.num_samples = num_samples
+        
+    def __iter__(self):
+        indices = list(range(len(self.dataset)))
+        random.shuffle(indices)
+        for k in range(len(self)):
+            if self.num_samples is None:
+                offset = k*self.batch_size
+                batch_indices = indices[offset:offset+self.batch_size]
+            else:
+                batch_indices = random.sample(range(len(self.dataset)), self.batch_size)
+            pair_indices = []
+            for idx in batch_indices:
+                y = self.dataset.get_class(idx)
+                pair_indices.append(random.choice(self.dataset.classwise_indices[y]))
+            yield batch_indices + pair_indices
+
+    def __len__(self):
+        if self.num_samples is None:
+            return (len(self.dataset)+self.batch_size-1) // self.batch_size
+        else:
+            return self.num_samples

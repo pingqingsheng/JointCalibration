@@ -58,7 +58,6 @@ class ECELoss(torch.nn.Module):
         elif self.reduction == 'sum':
             bins = []
             for bin_lower, bin_upper in zip(self.bin_lowers, self.bin_uppers):
-                # Calculated |confidence - accuracy| in each bin
                 in_bin = confidences.gt(bin_lower.item()) * confidences.le(bin_upper.item())
                 correct_in_bin = accuracies[in_bin].float().sum()
                 sum_confidence_in_bin = confidences[in_bin].sum()
@@ -88,29 +87,29 @@ class AverageMeter():
             self.metric_dict[f'{metric}_count'] = 0
             self.metric_dict[f'{metric}_history'] = []
             
-    def update(self, outputs:Union[torch.Tensor, torch.nn.Module]=None, labels:torch.Tensor=None, loss:torch.Tensor=None, eta_tilde:torch.Tensor=None):
+    def update(self, probs:Union[torch.Tensor, torch.nn.Module]=None, labels:torch.Tensor=None, loss:torch.Tensor=None, eta_tilde:torch.Tensor=None):
         
-        if not isinstance(outputs, torch.Tensor): # GP module
-            outputs = outputs.sample(32).mean(1)
+        if not isinstance(probs, torch.Tensor): # GP module
+            probs = probs.sample(32).mean(1)
         
-        if (outputs is not None) and (labels is not None):    
-            self.metric_dict['loss_val'] = float(((self.metric_dict['loss_val']*self.metric_dict['loss_count'])+self.criterion_ce(outputs, labels))/(self.metric_dict['loss_count']+len(outputs)))
-            self.metric_dict['acc_val']  = float(((self.metric_dict['acc_val']*self.metric_dict['acc_count'])+outputs.argmax(1).eq(labels).sum().item())/(self.metric_dict['acc_count']+len(outputs)))
-            self.metric_dict['loss_count'] += len(outputs)
-            self.metric_dict['acc_count']  += len(outputs)
+        if (probs is not None) and (labels is not None):    
+            self.metric_dict['loss_val'] = float(((self.metric_dict['loss_val']*self.metric_dict['loss_count'])+self.criterion_ce(probs, labels))/(self.metric_dict['loss_count']+len(probs)))
+            self.metric_dict['acc_val']  = float(((self.metric_dict['acc_val']*self.metric_dict['acc_count'])+probs.argmax(1).eq(labels).sum().item())/(self.metric_dict['acc_count']+len(probs)))
+            self.metric_dict['loss_count'] += len(probs)
+            self.metric_dict['acc_count']  += len(probs)
             
-            new_ece_outcome = self.criterion_ece(outputs, labels)
+            new_ece_outcome = self.criterion_ece(probs, labels)
             if self.metric_dict['ece_val'] == 0:
                 self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val']+new_ece_outcome[i][j]) for j in range(2)] for i in range(len(new_ece_outcome))]
             else:
                 self.metric_dict['ece_val'] = [[(self.metric_dict['ece_val'][i][j]+new_ece_outcome[i][j]) for j in range(2)] for i in range(len(new_ece_outcome))]
-            self.metric_dict['ece_count'] += len(outputs)
+            self.metric_dict['ece_count'] += len(probs)
             
-        if (outputs is not None) and (eta_tilde is not None):
-            confidence = torch.softmax(outputs, 1).max(1)[0].squeeze().detach().cpu()
+        if (probs is not None) and (eta_tilde is not None):
+            confidence = probs.max(1)[0].squeeze().detach().cpu()
             eta_tilde_max = eta_tilde.max(1)[0].squeeze()
-            self.metric_dict['l1_val'] = float(((self.metric_dict['l1_val']*self.metric_dict['l1_count'])+self.criterion_l1(confidence, eta_tilde_max))/(self.metric_dict['l1_count']+len(outputs)))
-            self.metric_dict['l1_count'] += len(outputs)
+            self.metric_dict['l1_val'] = float(((self.metric_dict['l1_val']*self.metric_dict['l1_count'])+self.criterion_l1(confidence, eta_tilde_max))/(self.metric_dict['l1_count']+len(probs)))
+            self.metric_dict['l1_count'] += len(probs)
         
     def get(self, metric:str, ind:int=-1):
         return self.metric_dict[f'{metric}_history'][ind]

@@ -95,4 +95,28 @@ class JointCalibration(BaseCalibrator):
         
         return self.criterion_mse(torch.sigmoid(calibrate_logits).squeeze(), correctness.squeeze())
     
+
+class JointCalibrationV2(JointCalibration):
     
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        
+    def pre_calibrate(self, 
+                      model: Union[List[torch.nn.Module], torch.nn.Module], 
+                      optimizer: torch.optim.Optimizer) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
+        
+        self.model = model
+        
+        calibrate_loader_sampler = self.calibrate_loader.sampler
+        
+        if hasattr(self.model, 'model_list'): # Ensemble Module
+            for i in range(len(self.model.model_list)):
+                self.model.model_list[i], optimizer = self.augment_network(self.model.model_list[i], optimizer, self.device)
+                if hasattr(self.model.model_list[i], 'likelihood'): # TODO: rewrite this part.  After augmenting a GP layer, re-assign common likelihood and gplayer
+                    self.model.model_list[i].likelihood = self.model.common_likelihood
+                    self.model.model_list[i].model.gp_layer = self.model.common_gplayer
+                    # optimizer = self.model.model_list[i].update_optimizer(self.model.model_list[i].model, optimizer, self.model.model_list[i].likelihood)
+        else:
+            self.model, optimizer = self.augment_network(self.model, optimizer, self.device)
+
+        return self, optimizer

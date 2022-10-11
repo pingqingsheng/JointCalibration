@@ -16,7 +16,7 @@ if __name__  == '__main__':
     parser.add_argument('--dataset', type=str, help='Experiment dataset', choices={'mnist', 'cifar10'})
     parser.add_argument('--noise_type', type=str, help='Label noise type', choices={'rcn', 'idl'})
     parser.add_argument('--noise_strength', type=str, help='Label noise strength')
-    parser.add_argument('--method', type=str, help='Calibration method to choose. Use + between different method. options=(raw, ts, mcdrop, cskd, ensemble, focal, bm, lula, gp, ours)')
+    parser.add_argument('--method', type=str, help='Calibration method to choose. Use + between different method. options=(raw, ts, mcdrop, cskd, ensemble, focal, bm, lula, gp, ours, oursv2)')
     parser.add_argument('--result_dir', type=str, help='Results save dir', default='./result')
     parser.add_argument('--checkpoint_dir', type=str, help='Training checkpoint save dir', default='./checkpoint')
     parser.add_argument('--fig_dir', type=str, help='figures save dir', default='./figures')

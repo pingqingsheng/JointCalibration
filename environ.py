@@ -17,16 +17,17 @@ from noise import inject_noise
 
 class Environ():
     
-    _available_method = {'raw':'BaseCalibrator', 
-                         'ts':'TemperatureScaling', 
-                         'ensemble':'Ensemble', 
-                         'mcdrop': 'MCDrop', 
-                         'cskd': 'CSKD', 
-                         'focal': 'Focal', 
-                         'bm': 'BeliefMatching', 
-                         'gp': 'GP', 
-                         'lula': 'LULA', 
-                         'ours': 'JointCalibration'}
+    _available_method = {'raw':      'BaseCalibrator', 
+                         'ts':       'TemperatureScaling', 
+                         'ensemble': 'Ensemble', 
+                         'mcdrop':   'MCDrop', 
+                         'cskd':     'CSKD', 
+                         'focal':    'Focal', 
+                         'bm':       'BeliefMatching', 
+                         'gp':       'GP', 
+                         'lula':     'LULA', 
+                         'ours':     'JointCalibration', 
+                         'oursv2':   'JointCalibrationV2'}
     
     def __init__(self, config: MutableMapping) -> None:
         
@@ -56,12 +57,11 @@ class Environ():
         
         return environ
     
-    
     def create_dataset(self) -> DataBuilder: 
                 
         methodname_list = self.config['args']['method'].split('+')
         datasetname = self.config['args']['dataset']
-            
+        
         databuilder = DataBuilder(
             datasetname = datasetname, 
             train_ratio = self.config['data'][self.config['args']['dataset']]['TRAIN_VALIDATION_RATIO'], 
