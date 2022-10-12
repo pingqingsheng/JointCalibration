@@ -37,6 +37,7 @@ class Trainer():
         self.metric_test  = AverageMeter(['l1', 'ece', 'acc', 'loss'], name='test')        
         self.timestamp   = datetime.today().strftime("%Y%m%d%H%M%S")
         
+        
     def train(self, 
               model: torch.nn.Module, 
               trainloader: torch.utils.data.DataLoader, 

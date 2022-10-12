@@ -26,18 +26,17 @@ class BaseCalibrator(torch.nn.Module):
             
     def pre_calibrate(self, 
                       model: torch.nn.Module, 
-                      optimizer: torch.optim.Optimizer
+                      optimizer: torch.optim.Optimizer = None, **kwargs
                       ) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
         
         self.model = model
 
         return self, optimizer
     
-    def post_calibrate(self, 
-                       optimizer: torch.optim.Optimizer) -> None:
+    def post_calibrate(self, **kwargs) -> None:
         
         if isinstance(self.model, BaseCalibrator):
-            self.model.post_calibrate(optimizer)
+            self.model.post_calibrate(**kwargs)
 
     def loss(self, logits: torch.Tensor, targets: torch.Tensor, **kwargs) -> Union[torch.Tensor, int]:   
         return torch.nn.functional.cross_entropy(logits[:, :self.num_classes], targets)

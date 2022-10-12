@@ -361,7 +361,7 @@ class LULAModel(torch.nn.Module):
 # >>> Train
 def train_lula_layer(lula_model, nll, in_loader, out_loader, prior_prec, l2_penalty=0, lr=1e-1, n_iter=1,
                      fisher_samples=1, alpha=1, beta=1, max_grad_norm=1000, progressbar=True, mc_samples=10, device=None):
-    # Train only the last-layer
+    # Train only the lula-layer
     for m in lula_model.modules():
         if type(m) == MaskedLinear or type(m) == MaskedConv2d:
             for p in m.parameters():

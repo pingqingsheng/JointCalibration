@@ -36,7 +36,7 @@ class MCDrop(BaseCalibrator):
     
     def _pre_calibrate(self, 
                       model: torch.nn.Module, 
-                      optimizer: torch.optim.Optimizer, 
+                      optimizer: torch.optim.Optimizer = None, 
                       **kwargs) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
         
         self.model = model

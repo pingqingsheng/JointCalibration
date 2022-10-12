@@ -3,6 +3,7 @@
 import os
 from typing import MutableMapping, List
 import random
+import re
 
 import numpy as np
 import torch
@@ -27,6 +28,7 @@ class Environ():
                          'gp':       'GP', 
                          'lula':     'LULA', 
                          'ours':     'JointCalibration', 
+                         'oursv1':   'JointCalibrationV1',
                          'oursv2':   'JointCalibrationV2'}
     
     def __init__(self, config: MutableMapping) -> None:
@@ -49,11 +51,27 @@ class Environ():
         gpu = self.config['args']['gpu']
         self.device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
         
+        datasetname = self.config['args']['dataset']
+        methodname  = self.config['args']['method']
+        noise_type  = self.config['args']['noise_type']
+        noise_strength = self.config['args']['noise_strength']
+        seed = self.config['args']['seed']
+        checkpoint_dir = self.config['args']['checkpoint_dir']
+        
         environ['gpu'] = gpu
         environ['result_dir'] = self.config['args']['result_dir']
         environ['checkpoint_dir'] = self.config['args']['checkpoint_dir']
         environ['fig_dir'] = self.config['args']['fig_dir']
         environ['timestamp'] = self.timestamp
+        
+        if self.config['args']['use_checkpoint']:
+            re_methodname = methodname.replace('+', '.')
+            checkpoint_files = list(filter(re.compile(f'{datasetname}_{re_methodname}_{noise_type}_{noise_strength}_{seed}_.*.pth').match, os.listdir(checkpoint_dir)))
+            if len(checkpoint_files): # use the most recent one
+                self.checkpoint_path = os.path.join(checkpoint_dir, sorted(list(checkpoint_files))[-1])
+                environ['checkpoint_statedict'] = torch.load(self.checkpoint_path)
+        else:
+            raise FileNotFoundError(f"checkpoint is not found !")
         
         return environ
     
@@ -119,7 +137,6 @@ class Environ():
         networkbuilder.create()
         
         return networkbuilder
-    
     
     def create_trainer(self) -> Trainer: 
         

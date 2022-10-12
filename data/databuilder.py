@@ -96,12 +96,12 @@ class DataBuilder():
     def get_sampler(method_list: List, batch_size:int) -> Sampler:
         
         if 'cskd' in method_list:
-            if 'oursv2' in method_list:
+            if 'oursv3' in method_list:
                 return lambda x: PairBatchSampler(x, num_samples=int(0.8*len(x)), batch_size=batch_size)
             else:
                 return lambda x: PairBatchSampler(x, batch_size=batch_size)
         else:
-            if 'oursv2' in method_list:
+            if 'oursv3' in method_list:
                 return lambda x: BatchSampler(RandomSampler(x, num_samples=int(0.8*len(x))), batch_size=batch_size, drop_last=False)
             else:
                 return lambda x: BatchSampler(RandomSampler(x), batch_size=batch_size, drop_last=False)

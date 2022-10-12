@@ -9,7 +9,7 @@ from torch.utils.data import BatchSampler, RandomSampler
 from .basecalibrator import BaseCalibrator
 
 
-class JointCalibration(BaseCalibrator):
+class JointCalibrationV1(BaseCalibrator):
     
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -40,8 +40,10 @@ class JointCalibration(BaseCalibrator):
         _, pred = f.max(1)
         pred = pred.view(-1, 1)
         # re-normalize the prob simplex according to calibration probability
+
+        f = (1-g)*f/(f.sum(1)-f.max(1)[0]).view(-1, 1)
         f.scatter_(0, pred, g)
-        f /= f.sum(1).view(-1, 1)
+        f = torch.clip(f, 0.001, 0.999)/torch.clip(f, 0.001, 0.999).sum(1).view(-1, 1)
         
         return f
     
@@ -97,29 +99,3 @@ class JointCalibration(BaseCalibrator):
         
         return self.criterion_mse(torch.sigmoid(calibrate_logits).squeeze(), correctness.squeeze())
     
-
-class JointCalibrationV2(JointCalibration):
-    
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        
-    def pre_calibrate(self, 
-                      model: Union[List[torch.nn.Module], torch.nn.Module], 
-                      optimizer: torch.optim.Optimizer) -> Tuple[torch.nn.Module, torch.optim.Optimizer]:
-        
-        self.model = model
-        
-        calibrate_sampler = lambda x : BatchSampler(RandomSampler(x, num_samples=int(0.8*x)), batch_size=self.calibrate_loader.batch_size)
-        self.calibrate_loader = torch.utils.data.DataLoader(self.calibrate_loader.dataset, sampler=calibrate_sampler)
-        
-        if hasattr(self.model, 'model_list'): # Ensemble Module
-            for i in range(len(self.model.model_list)):
-                self.model.model_list[i], optimizer = self.augment_network(self.model.model_list[i], optimizer, self.device)
-                if hasattr(self.model.model_list[i], 'likelihood'): # TODO: rewrite this part.  After augmenting a GP layer, re-assign common likelihood and gplayer
-                    self.model.model_list[i].likelihood = self.model.common_likelihood
-                    self.model.model_list[i].model.gp_layer = self.model.common_gplayer
-                    # optimizer = self.model.model_list[i].update_optimizer(self.model.model_list[i].model, optimizer, self.model.model_list[i].likelihood)
-        else:
-            self.model, optimizer = self.augment_network(self.model, optimizer, self.device)
-
-        return self, optimizer
