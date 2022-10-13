@@ -19,12 +19,18 @@ class GP(BaseCalibrator):
         
     def forward(self, x:torch.Tensor, mode='train', **kwargs):
         
+        if mode=='eval':
+            self.likelihood.eval()
         with gpytorch.settings.num_likelihood_samples(32) as _, gpytorch.settings.cholesky_jitter(1e-1) as _:
             logits = self.model(x)
         
         return logits
     
     def get_prob(self, logits: Union[List[torch.nn.Module], torch.Tensor], mode:str ='train') -> torch.Tensor:
+        
+        if mode=='eval':
+            self.likelihood.eval()
+        
         with gpytorch.settings.num_likelihood_samples(32) as _, gpytorch.settings.cholesky_jitter(1e-1) as _:
             if isinstance(logits, List):
                 pred_prob = 0

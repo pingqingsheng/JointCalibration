@@ -68,7 +68,9 @@ class Ensemble(BaseCalibrator):
                 orig_weightdecay = optimizer.param_groups[0]['weight_decay']
                 optimizer.add_param_group({'params': [x for x in model_i.parameters() if x.data_ptr() not in exist_dataptr], 'lr':orig_lr, 'weight_decay':orig_weightdecay})
                 self.model_list.append(model_i.to(self.device))
-                
+        
+        self.model_list = torch.nn.ModuleList(self.model_list)
+        
         return self, optimizer
     
     @staticmethod

@@ -72,6 +72,9 @@ class Environ():
                 environ['checkpoint_statedict'] = torch.load(self.checkpoint_path)
             else:
                 raise FileNotFoundError(f"checkpoint is not found !")
+            
+            # Monkey-patch
+            environ['default_optimizer'] = torch.optim.SGD([torch.tensor(0., requires_grad=True)], lr=1e-2)
         
         return environ
     

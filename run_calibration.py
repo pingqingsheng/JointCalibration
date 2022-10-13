@@ -44,11 +44,11 @@ if __name__  == '__main__':
     os.makedirs(env['checkpoint_dir'], exist_ok=True)
     if args.use_checkpoint:
         model = network.model
+        model = model.to(envconfig.device)
         for calibrator in calibrators:
-            model, _ = calibrator.pre_calibrate(model=model)
+            model, _ = calibrator.pre_calibrate(model=model, optimizer=env['default_optimizer'])
         model.load_state_dict(env['checkpoint_statedict'])
         model.post_calibrate()
-        model = model.to(envconfig.device)
         
         # monkey-patch
         envconfig.config['args']['method'] = 'oursv2'
@@ -74,6 +74,8 @@ if __name__  == '__main__':
     
     # Save result
     os.makedirs(env['result_dir'], exist_ok=True)
+    if args.use_checkpoint:
+        args.method += 'oursv2'
     save_filepath = os.path.join(env['result_dir'], f"{args.dataset}_{args.method}_{args.noise_type}_{args.noise_strength}_{args.seed}_{env['timestamp']}.pkl")
     with open(save_filepath, 'wb') as f:
         pkl.dump(config, f)

@@ -30,7 +30,7 @@ class JointCalibrationV2(BaseCalibrator):
         if isinstance(f, List):
             logits = []
             for logits_i in f:
-                logits.append(torch.cat([logits_i, g]), 1)
+                logits.append(torch.cat([logits_i, g], 1))
         elif isinstance(f, torch.nn.Module):
             logits = (f, g)
         else:
@@ -87,8 +87,9 @@ class JointCalibrationV2(BaseCalibrator):
             for _, (_, imgs, labels, _) in enumerate(self.calibrate_loader):
                 
                 imgs, labels = imgs.to(self.device), labels.to(self.device)
-                pred_conf = self.model.get_prob(imgs)
-                _, pred = pred_conf.argmax(1)
+                logits = self.model(imgs)
+                pred_conf = self.model.get_prob(logits)
+                _, pred = pred_conf.max(1)
                 correctness = pred.eq(labels)
                 
                 calibrate_logits = self.calibrate_network(imgs)

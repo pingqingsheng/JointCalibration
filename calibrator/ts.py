@@ -47,7 +47,7 @@ class TemperatureScaling(BaseCalibrator):
         self.model.eval()
         with torch.no_grad():
             for _, input, label, _ in self.calibrate_loader:
-                input  = input.to(self.device)
+                input, label  = input.to(self.device), label.to(self.device)
                 logits = self.model(input)
                 logits_list.append(logits[:, :self.num_classes])
                 labels_list.append(label)
@@ -60,7 +60,7 @@ class TemperatureScaling(BaseCalibrator):
         # print('Before temperature - NLL: %.3f, ECE: %.3f' % (before_temperature_nll, before_temperature_ece))
 
         # Next: optimize the temperature w.r.t. NLL
-        optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=100)
+        optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=50, line_search_fn = 'strong_wolfe')
 
         def eval():
             optimizer.zero_grad()
