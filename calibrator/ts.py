@@ -30,14 +30,14 @@ class TemperatureScaling(BaseCalibrator):
         return logits / self.temperature         
         
     
-    def post_calibrate(self, **kwargs) -> None:
+    def post_calibrate(self, *args, **kwargs) -> None:
         # """Tune the tempearature of the model (using the validation set).
         # We're going to set it to optimize NLL.
         # valid_loader (DataLoader): validation set loader
         # """
         
         if isinstance(self.model, BaseCalibrator):
-            self.model.post_calibrate()
+            self.model.post_calibrate(kwargs)
         
         nll_criterion = torch.nn.CrossEntropyLoss()
 

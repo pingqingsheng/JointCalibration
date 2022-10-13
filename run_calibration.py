@@ -43,8 +43,9 @@ if __name__  == '__main__':
     
     os.makedirs(env['checkpoint_dir'], exist_ok=True)
     if args.use_checkpoint:
+        model = network.model
         for calibrator in calibrators:
-            model, _ = calibrator.pre_calibrate(model=network.model)
+            model, _ = calibrator.pre_calibrate(model=model)
         model.load_state_dict(env['checkpoint_statedict'])
         model.post_calibrate()
         model = model.to(envconfig.device)

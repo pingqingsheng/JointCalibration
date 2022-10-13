@@ -33,7 +33,7 @@ class BaseCalibrator(torch.nn.Module):
 
         return self, optimizer
     
-    def post_calibrate(self, **kwargs) -> None:
+    def post_calibrate(self, *args, **kwargs) -> None:
         
         if isinstance(self.model, BaseCalibrator):
             self.model.post_calibrate(**kwargs)

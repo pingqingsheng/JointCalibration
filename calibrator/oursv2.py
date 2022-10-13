@@ -26,11 +26,24 @@ class JointCalibrationV2(BaseCalibrator):
         f = self.model(x)
         g = self.calibrate_network(x)
         
-        return torch.cat([f, g], 1)
+        # TODO: modify this to accomodate ensemble + gp
+        if isinstance(f, List):
+            logits = []
+            for logits_i in f:
+                logits.append(torch.cat([logits_i, g]), 1)
+        elif isinstance(f, torch.nn.Module):
+            logits = (f, g)
+        else:
+            logits = torch.cat([f, g], 1)
+            
+        return logits
     
     def get_prob(self, logits:Union[torch.Tensor, List[Union[torch.Tensor, torch.distributions.Distribution]]], **kwargs) -> torch.Tensor: 
         
-        f = self.model.get_prob(logits)
+        if isinstance(logits, Tuple):
+            f = self.model.get_prob(logits[0])
+        else:
+            f = self.model.get_prob(logits)
         
         if isinstance(logits, List): # Ensemble
             g = 0
@@ -39,14 +52,14 @@ class JointCalibrationV2(BaseCalibrator):
                 if isinstance(logits_i, torch.Tensor):
                     calibrate_logits = logits_i[:, -1]
                 else: # for GP module
-                    calibrate_logits = logits_i.sample_n(32).mean(0)[:, -1]
+                    calibrate_logits = logits_i[-1]
                 g += torch.sigmoid(calibrate_logits).view(-1, 1)
             g /= len(logits)
         else:
             if isinstance(logits, torch.Tensor):
                 calibrate_logits = logits[:, -1]
             else:
-                calibrate_logits = logits.sample_n(32).mean(0)[:, -1]
+                calibrate_logits = logits[-1]
             g = torch.sigmoid(calibrate_logits).view(-1, 1)
         
         _, pred = f.max(1)
@@ -74,8 +87,12 @@ class JointCalibrationV2(BaseCalibrator):
             for _, (_, imgs, labels, _) in enumerate(self.calibrate_loader):
                 
                 imgs, labels = imgs.to(self.device), labels.to(self.device)
+                pred_conf = self.model.get_prob(imgs)
+                _, pred = pred_conf.argmax(1)
+                correctness = pred.eq(labels)
+                
                 calibrate_logits = self.calibrate_network(imgs)
-                loss = self.criterion_mse(torch.sigmoid(calibrate_logits).squeeze(), labels.float())
+                loss = self.criterion_mse(torch.sigmoid(calibrate_logits).squeeze(), correctness.float())
                 
                 optimizer_calibrate.zero_grad()
                 loss.backward()

@@ -85,9 +85,9 @@ class Trainer():
             scheduler.step()
             self.metric_train.flush()
             
-            model.post_calibrate(optimizer=optimizer)
-            
             if self.verbose and epoch%self.monitor_window==0:
+                
+                model.post_calibrate(optimizer=optimizer)
                 
                 self.eval(model, calibrators, validloader, self.metric_valid)
                 self.eval(model, calibrators, testloader,  self.metric_test)
@@ -98,7 +98,7 @@ class Trainer():
                 tqdm.write(self.logging(self.metric_train, 'acc') +  '\t' + self.logging(self.metric_valid, 'acc')+ '\t' + self.logging(self.metric_test, 'acc'))
                 tqdm.write(self.logging(self.metric_train, 'ece') +  '\t' + self.logging(self.metric_valid, 'ece')+ '\t' + self.logging(self.metric_test, 'ece'))
 
-            if epoch%self.checkpoint_window==0:
+            if (epoch+1)%self.checkpoint_window==0:
                 torch.save(model.state_dict(), self.checkpoint_path)
         
         return model

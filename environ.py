@@ -70,8 +70,8 @@ class Environ():
             if len(checkpoint_files): # use the most recent one
                 self.checkpoint_path = os.path.join(checkpoint_dir, sorted(list(checkpoint_files))[-1])
                 environ['checkpoint_statedict'] = torch.load(self.checkpoint_path)
-        else:
-            raise FileNotFoundError(f"checkpoint is not found !")
+            else:
+                raise FileNotFoundError(f"checkpoint is not found !")
         
         return environ
     
