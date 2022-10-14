@@ -1,6 +1,7 @@
 #!/usr/env/bin python
 
 from typing import MutableMapping, Tuple, Union, List
+from matplotlib.pyplot import isinteractive
 
 import torch
 
@@ -52,3 +53,6 @@ class BaseCalibrator(torch.nn.Module):
             logits = logits
             loss = self.loss(logits, targets)
         return loss
+    
+    def eval(self):
+        self.model.eval()

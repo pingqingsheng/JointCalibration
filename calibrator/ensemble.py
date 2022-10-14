@@ -76,3 +76,4 @@ class Ensemble(BaseCalibrator):
     @staticmethod
     def loss(*args, **kwargs) -> Union[torch.Tensor, int]:
         return 0
+    

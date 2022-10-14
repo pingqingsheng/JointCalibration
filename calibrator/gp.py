@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from typing import Tuple, Union, List
+from matplotlib.font_manager import weight_dict
 from sklearn.covariance import log_likelihood
 
 import torch
@@ -18,18 +19,13 @@ class GP(BaseCalibrator):
         self.encode_dim = kwargs['config']['ENCODE_DIM']
         
     def forward(self, x:torch.Tensor, mode='train', **kwargs):
-        
-        if mode=='eval':
-            self.likelihood.eval()
+            
         with gpytorch.settings.num_likelihood_samples(32) as _, gpytorch.settings.cholesky_jitter(1e-1) as _:
             logits = self.model(x)
         
         return logits
     
     def get_prob(self, logits: Union[List[torch.nn.Module], torch.Tensor], mode:str ='train') -> torch.Tensor:
-        
-        if mode=='eval':
-            self.likelihood.eval()
         
         with gpytorch.settings.num_likelihood_samples(32) as _, gpytorch.settings.cholesky_jitter(1e-1) as _:
             if isinstance(logits, List):
@@ -40,6 +36,7 @@ class GP(BaseCalibrator):
                 pred_prob /= len(logits)
             else:
                 pred_prob = self.likelihood(logits).probs.mean(0)
+        
         return pred_prob[:, :self.num_classes]
     
 
@@ -63,21 +60,22 @@ class GP(BaseCalibrator):
     @staticmethod
     def update_optimizer(network:torch.nn.Module, optimizer: torch.optim.Optimizer, likelihood: torch.distributions.Distribution) -> torch.optim.Optimizer:
         
-        backbone_lr = optimizer.param_groups[0]['lr']
-        orig_params = optimizer.param_groups[0]['params']
+        backbone_lr = 10*optimizer.param_groups[0]['lr']
         
-        gp_hyperparams = [x for x in network.gp_layer.hyperparameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
-        gp_viparams    = [x for x in network.gp_layer.variational_parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
-        ll_params      = [x for x in likelihood.parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
-        other_params   = [x for x in network.encoder.parameters() if x.data_ptr() not in [y.data_ptr() for y in orig_params]]
+        gp_hyperparams = [x for x in network.gp_layer.hyperparameters()]
+        gp_viparams    = [x for x in network.gp_layer.variational_parameters()]
+        ll_params      = [x for x in likelihood.parameters()]
+        other_params   = [x for x in network.parameters() if x.data_ptr() not in [y.data_ptr() for y in gp_hyperparams+gp_viparams+ll_params]]
         
+        if len(other_params):
+            optimizer.param_groups[0].update({'params': other_params, 'lr':backbone_lr, 'weight_decay':1e-4, 'nesterov':True, 'momentum':0.9})
         if len(gp_hyperparams):
-            optimizer.add_param_group({'params':gp_hyperparams, 'lr':backbone_lr*0.01, 'weight_decay':0})
+            optimizer.add_param_group({'params':gp_hyperparams, 'lr':backbone_lr*0.01, 'weight_decay':0, 'nesterov':True, 'momentum':0.9})
         if len(gp_viparams):
-            optimizer.add_param_group({'params':gp_viparams,    'lr':backbone_lr,      'weight_decay':0})
-        if len(orig_params+ll_params+other_params):
-            optimizer.param_groups[0].update({'params': orig_params+ll_params+other_params})
-        
+            optimizer.add_param_group({'params':gp_viparams,    'lr':backbone_lr,      'weight_decay':0, 'nesterov':True, 'momentum':0.9})
+        if len(ll_params):
+            optimizer.add_param_group({'params':ll_params,      'lr':backbone_lr,      'weight_decay':0, 'nesterov':True, 'momentum':0.9})
+
         return optimizer
     
     def loss(self, logits:Union[List[torch.nn.Module], torch.nn.Module], targets:torch.Tensor) -> torch.Tensor:
@@ -93,3 +91,7 @@ class GP(BaseCalibrator):
                 loss = -criterion_mll(logits, targets)
             
         return loss
+    
+    def eval(self):
+        self.likelihood.eval()
+        self.model.eval()
